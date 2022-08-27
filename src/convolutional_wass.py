@@ -1,4 +1,7 @@
+from logging import raiseExceptions
+import math
 import torch
+import torch.nn.functional as F
 
 small_constant = 1e-9
 
@@ -94,6 +97,72 @@ def convolutional_wasserstein_barycenter_2d(A, reg, weights=None, numItermax=100
                 break
         return bar
 
-###########################################
-# 1D conv wass barycenter
-############################################
+############################################################################
+# 1D conv wass barycenter. This is added purely for academic purposes
+############################################################################
+
+def create_gaussian_kernel_window(window_size, sigma = None) -> torch.Tensor:
+    """
+    Create 1D weights for a discrete gaussian kernel convolution.
+    If sigma is not provided, it will be computed from the window size. Beware this is a a bad idea.
+    """
+    if not sigma:
+        # Compute sigma in terms of pixels.
+        # since sigma directly controls the error of the wasserstein approximations. 
+        # Expect this default sigma value to be blurry.
+        sigma = 2.5
+        sigma = 0.5 * (window_size - 1) / sigmas_per_pixel
+
+    gauss_ker = torch.tensor(
+        [math.exp(-(x - 0.5 * (window_size - 1)) ** 2 / float(2 * sigma ** 2)) for x in range(window_size)],
+        dtype=torch.float,
+        requires_grad=False,
+    )
+    gauss_ker = (gauss_ker/gauss_ker.sum()).unsqueeze(1)
+
+    return gauss_ker
+
+
+def wasserstein_distance(mu0, mu1, sigma, window_size, max_iter, threshold=1e-5):
+    """
+    mu0, mu1: The source and target distributions
+    sigma (float) : controls the accuracy of the Sinkhorn iteration. Smaller is better but will require more iterations to converge
+    window_size (int) : window_sizes for the 1d Gaussian kernel matrix
+    Returns: Convolutional wasserstein distance between the two distributions
+    """
+
+    #TODO: This is a bit buggy code but essentially implements the algorithm as described in the paper.
+
+    G = create_gaussian_kernel_window(window_size, sigma).to(mu0.device)
+    G = G.reshape([1,1,G.shape[0]])
+
+    if window_size % 2 != 0 :
+      H = lambda x: F.conv1d(x, G, padding=window_size// 2)[0]
+    else: 
+      raise NotImplementedError('There is a shape mismatch error. The output shape is [1,n+1] for a given input tensor of shape [1,n] ')
+
+    gamma = sigma **2
+
+    err = 1
+    a = 1.0 / mu0.shape[-1]
+
+    v = torch.ones(mu0.shape).to(mu0.device)
+    w = torch.ones(mu0.shape).to(mu0.device)
+
+
+    for i in range(max_iter):
+
+        v1 = v
+        w1 = w
+        v = mu0 / H(a * w)
+        w = mu1 / H(a * v)
+
+        d = gamma * (a * (mu0 * v.log() + mu1 * w.log())).sum()
+
+        if i % 10 == 9:
+          err = (v - v1).abs().sum(-1).mean() + (w - w1).abs().sum(-1).mean()
+
+          if err.item() < threshold:
+                break
+
+    return gamma * (a * (mu0 * v.log() + mu1 * w.log())).sum()
