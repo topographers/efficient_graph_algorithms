@@ -18,7 +18,7 @@ def get_args_parser():
     parser = argparse.ArgumentParser('TopoGrapher', add_help=False)
 
     # Model parameters
-    parser.add_argument('--object_folder', default='../curvox_dataset/meshes/ycb/014_lemon', type=str, help="""path for sample data.""")
+    parser.add_argument('--object_folder', default='./curvox_dataset/meshes/ycb/014_lemon', type=str, help="""path for sample data.""")
     
     parser.add_argument('--cuda', type=lambda x: bool(strtobool(x)), default=False, nargs='?', const=True, help='if toggled, cuda will not be enabled by default')
     parser.add_argument('--gpu', type=int, default=0)
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     """
-    args = parser.parse_args(['--object_folder','../curvox_dataset/meshes/ycb/014_lemon', 
+    args = parser.parse_args(['--object_folder','./curvox_dataset/meshes/ycb/014_lemon', 
                               '--method', 'BruteForce',
                               '--kernel','GaussianKernel',
                               '--cuda', 'False',
