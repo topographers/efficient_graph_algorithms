@@ -1,0 +1,5 @@
+open3d 
+memory_profiler
+trimesh 
+pytorch 
+
