@@ -1,15 +1,20 @@
 # efficient_graph_algorithms
 Implementations of efficient graph algorithms
 
-To run the script on the sample lemon dataset:
-
-```sh
-python main.py 
+## Installation
+```bash
+git clone git@github.com:Topographers/efficient_graph_algorithms.git
+cd efficient_graph_algorithms
+pip3 install -r requirements.txt
+pip3 install -e . --user
 ```
 
-`--method`: current version only supports BruteForce matrix calculation in time O(n^2).
+## Coding Guidelines
 
-`--kernel`: this specifies the function f used in f(dist(i,j)). Current version only supports gaussian kernel. 
+We have a strict coding guideline that is written [here](docs/coding_guidelines.md). This should be read thoroughly before contribution to this repository.
 
-`--visualize_mesh`: if this is set as True, the dataset mesh be visualized with open3d.
+## Experiments
+For information on how to run each experiment:
+
+* [scripts/experiments/gaussian_kernel_test.py](docs/experiments/gaussian_kernel_test.md)
 

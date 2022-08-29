@@ -1,5 +1,8 @@
-open3d 
+open3d~=0.13.0+b6733d2eb
 memory_profiler
-trimesh 
-pytorch 
-
+trimesh~=3.9.25
+pytorch
+torch~=1.8.1+cu111
+pysimplelog~=4.0.0
+numpy~=1.23.0
+setuptools~=63.1.0
