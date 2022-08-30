@@ -13,11 +13,3 @@ class GaussianKernel(object):
 
     def __call__(self, M):
         return torch.exp(- self.sigma * M)
-
-
-def main():
-    f = GaussianKernel(0.1)
-
-
-if __name__ == '__main__':
-    main()
