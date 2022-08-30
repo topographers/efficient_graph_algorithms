@@ -1,5 +1,6 @@
 import torch
 
+
 class SinkhornDistance(torch.nn.Module):
     """
     Algorithm follows the famous work of Cuturi : https://papers.nips.cc/paper/2013/file/af21d0c97db2e27e13572cbf59eb343d-Paper.pdf
@@ -19,7 +20,10 @@ class SinkhornDistance(torch.nn.Module):
         - Input: :math:`(N, P_1, D_1)`, :math:`(N, P_2, D_2)`
         - Output: :math:`(N)` or :math:`()`, depending on `reduction`
     """
-    def __init__(self, eps, max_iter, reduction='none', cost_matrix=None, threshold=1e-4):
+
+    def __init__(
+        self, eps, max_iter, reduction="none", cost_matrix=None, threshold=1e-4
+    ):
         super(SinkhornDistance, self).__init__()
         self.eps = eps
         self.max_iter = max_iter
@@ -29,7 +33,7 @@ class SinkhornDistance(torch.nn.Module):
 
     def forward(self, x, y):
         # The Sinkhorn algorithm takes as input three variables :
-        if self.cost_matrix is None :
+        if self.cost_matrix is None:
             C = self._cost_matrix(x, y)  # Wasserstein cost function
         else:
             C = self.cost_matrix
@@ -42,10 +46,18 @@ class SinkhornDistance(torch.nn.Module):
             batch_size = x.shape[0]
 
         # both marginals are fixed with equal weights
-        mu = torch.empty(batch_size, x_points, dtype=torch.float,
-                         requires_grad=False).fill_(1.0 / x_points).to(x.device).squeeze()
-        nu = torch.empty(batch_size, y_points, dtype=torch.float,
-                         requires_grad=False).fill_(1.0 / y_points).to(x.device).squeeze()
+        mu = (
+            torch.empty(batch_size, x_points, dtype=torch.float, requires_grad=False)
+            .fill_(1.0 / x_points)
+            .to(x.device)
+            .squeeze()
+        )
+        nu = (
+            torch.empty(batch_size, y_points, dtype=torch.float, requires_grad=False)
+            .fill_(1.0 / y_points)
+            .to(x.device)
+            .squeeze()
+        )
 
         u = torch.zeros_like(mu).to(x.device)
         v = torch.zeros_like(nu).to(x.device)
@@ -56,8 +68,19 @@ class SinkhornDistance(torch.nn.Module):
         # Sinkhorn iterations
         for i in range(self.max_iter):
             u1 = u  # useful to check the update
-            u = self.eps * (torch.log(mu+1e-8) - torch.logsumexp(self.M(C, u, v), dim=-1)) + u #TODO: add this in the code instead of hardcoding it like this
-            v = self.eps * (torch.log(nu+1e-8) - torch.logsumexp(self.M(C, u, v).transpose(-2, -1), dim=-1)) + v
+            u = (
+                self.eps
+                * (torch.log(mu + 1e-8) - torch.logsumexp(self.M(C, u, v), dim=-1))
+                + u
+            )  # TODO: add this in the code instead of hardcoding it like this
+            v = (
+                self.eps
+                * (
+                    torch.log(nu + 1e-8)
+                    - torch.logsumexp(self.M(C, u, v).transpose(-2, -1), dim=-1)
+                )
+                + v
+            )
             err = (u - u1).abs().sum(-1).mean()
 
             actual_nits += 1
@@ -70,9 +93,9 @@ class SinkhornDistance(torch.nn.Module):
         # Sinkhorn distance
         cost = torch.sum(pi * C, dim=(-2, -1))
 
-        if self.reduction == 'mean':
+        if self.reduction == "mean":
             cost = cost.mean()
-        elif self.reduction == 'sum':
+        elif self.reduction == "sum":
             cost = cost.sum()
 
         return cost, pi, C
