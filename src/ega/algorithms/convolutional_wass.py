@@ -149,7 +149,7 @@ def convolutional_wasserstein_barycenter_2d(
 
 def convolutional_wasserstein_barycenter_pt_cloud(
     A,
-    reg,
+    reg=None,
     weights=None,
     numItermax=10000,
     stopThr=1e-4,
@@ -215,7 +215,13 @@ def convolutional_wasserstein_barycenter_pt_cloud(
     else:
         assert len(weights) == A.shape[0]
 
+    if reg is None and conv_operator is None:
+        raise ValueError(
+            "At least one of the regularizer or conv_operator must be given"
+        )
+
     n_hists, width, _, _ = A.shape
+
     # build the convolution operator
     # this is equivalent to blurring on horizontal then vertical directions.
     if conv_operator is None:
