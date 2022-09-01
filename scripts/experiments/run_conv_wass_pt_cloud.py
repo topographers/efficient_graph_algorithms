@@ -168,3 +168,5 @@ def main():
 
 
 # TODO : VISUALIZE THESE OBJECTS. NEED HELP
+if __name__ == "__main__":
+    main()
