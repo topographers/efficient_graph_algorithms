@@ -207,6 +207,7 @@ def convolutional_wasserstein_barycenter_pt_cloud(
         on Graphics (TOG), 34(4), 66
     .. [37] Janati, H., Cuturi, M., Gramfort, A. Proceedings of the 37th
         International Conference on Machine Learning, PMLR 119:4692-4701, 2020
+        Also : https://github.com/hichamjanati/debiased-ot-barycenters
     """
 
     if weights is None:
