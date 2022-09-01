@@ -12,7 +12,7 @@ def convol_imgs(imgs, K1, K2=None):
     Simple convolution. First it blurs along x-axis and then y-axis
     """
     if K2 is None:
-        K1 = K2
+        K2 = K1
     kx = torch.einsum("...ij,kjl->kil", K1, imgs)
     kxy = torch.einsum("...ij,klj->kli", K2, kx)
     return kxy
