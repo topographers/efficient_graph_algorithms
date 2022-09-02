@@ -5,3 +5,8 @@ torch
 pot
 pytest
 pyvista
+open3d~=0.13.0+b6733d2eb
+memory_profiler
+trimesh~=3.9.25
+pysimplelog~=4.0.0
+setuptools~=63.1.0
