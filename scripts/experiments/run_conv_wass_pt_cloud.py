@@ -9,7 +9,7 @@ import torch
 import pyvista as pv
 from pyvista import examples
 
-from ega.util.utils import rescale_data
+from util.mesh_transformations import rescale_mesh
 from ega.algorithms.convolutional_wass import (
     convol_clouds,
     convolutional_wasserstein_barycenter_pt_cloud,
@@ -116,14 +116,14 @@ def main():
     alpha = alpha.smooth(args.smoothing_factor, relaxation_factor=args.relax_factor)
     beta = beta.smooth(args.smoothing_factor, relaxation_factor=args.relax_factor)
 
-    alpha = rescale_data(alpha, args.scale_meshes)
-    beta = rescale_data(beta, args.scale_meshes)
+    alpha = rescale_mesh(alpha, args.scale_meshes)
+    beta = rescale_mesh(beta, args.scale_meshes)
     beta.rotate_y(args.rot_second_obj)
     #####################
 
     ##### set up histograms and create empirical distributions #####
 
-    n_features = args.width**3
+    n_features = args.width ** 3
 
     hist_grid = torch.linspace(-1.0, 1.0, args.width + 1)
     grid = torch.linspace(-1.0, 1.0, args.width)
@@ -153,7 +153,7 @@ def main():
         weights = torch.tensor([1.0 - w, w])
         t0 = time()
         bar_ibp = convolutional_wasserstein_barycenter_pt_cloud(
-            hists, reg=args.regularizer, weights=weights, stopThr=args.error
+            hists, reg=args.regularizer, weights=weights, threshold=args.error
         )
         t1 = time()
         print("IBP done in ", t1 - t0)
