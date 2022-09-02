@@ -97,7 +97,10 @@ def get_args_parser():
 
 def main():
 
-    parser = argparse.ArgumentParser("TopoGrapher", parents=[get_args_parser()])
+    parser = argparse.ArgumentParser(
+        "Test Convolutional Wasserstein Distance on Point Clouds",
+        parents=[get_args_parser()],
+    )
 
     args = parser.parse_args()
 
