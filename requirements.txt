@@ -5,6 +5,7 @@ torch
 pot
 pytest
 pyvista
+simple-3dviz
 open3d~=0.13.0+b6733d2eb
 memory_profiler
 trimesh~=3.9.25
