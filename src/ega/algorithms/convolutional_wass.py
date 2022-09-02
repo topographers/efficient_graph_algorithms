@@ -7,7 +7,7 @@ import torch.nn.functional as F
 small_constant = 1e-12
 
 
-def convol_imgs(imgs, K1, K2=None):
+def convolve_images(imgs, K1, K2=None):
     """
     Simple convolution. First it blurs along x-axis and then y-axis
     """
@@ -18,7 +18,7 @@ def convol_imgs(imgs, K1, K2=None):
     return kxy
 
 
-def convol_clouds(cloud, K):
+def convolve_clouds(cloud, K):
     """
     Convolution for 3d point clouds. First 1d convolution along x-axis, then y-axis and finally z-axis.
     """
@@ -29,11 +29,11 @@ def convol_clouds(cloud, K):
 
 
 def convolutional_wasserstein_barycenter_2d(
-    A,
+    hist_images,
     reg,
     weights=None,
-    numItermax=10000,
-    stopThr=1e-4,
+    max_iterations=10000,
+    threshold=1e-4,
     conv_method="simple",
     conv_operator=None,
 ):
@@ -53,15 +53,15 @@ def convolutional_wasserstein_barycenter_2d(
     as proposed in :ref:`[21] <references-convolutional-barycenter-2d>`
     Parameters
     ----------
-    A : array-like, shape (n_hists, width, height)
+    hist_images : array-like, shape (n_hists, width, height)
         `n` distributions (2D images) of size `width` x `height`. Each image is considered a distribution over the pixels.
     reg : float
         Regularization term >0
     weights : array-like, shape (n_hists,)
         Weights of each image on the simplex (barycentric coodinates)
-    numItermax : int, optional
+    max_iterations : int, optional
         Max number of iterations
-    stopThr : float, optional
+    threshold : float, optional
         Stop threshold on error (> 0)
     conv_method : str, optional, default='simple'
         type of method to be used to compute the action of the kernel on a matrix
@@ -85,30 +85,38 @@ def convolutional_wasserstein_barycenter_2d(
     """
 
     if weights is None:
-        weights = (torch.ones(A.shape[0]) / A.shape[0]).to(A.device)
+        weights = (torch.ones(hist_images.shape[0]) / hist_images.shape[0]).to(
+            hist_images.device
+        )
     else:
-        assert len(weights) == A.shape[0]
+        assert len(weights) == hist_images.shape[0]
 
-    bar = torch.ones(A.shape[1:], dtype=A.dtype, device=A.device)
+    bar = torch.ones(
+        hist_images.shape[1:], dtype=hist_images.dtype, device=hist_images.device
+    )
     bar /= torch.sum(bar)
-    U = torch.ones(A.shape, dtype=A.dtype, device=A.device)
-    V = torch.ones(A.shape, dtype=A.dtype, device=A.device)
+    U = torch.ones(
+        hist_images.shape, dtype=hist_images.dtype, device=hist_images.device
+    )
+    V = torch.ones(
+        hist_images.shape, dtype=hist_images.dtype, device=hist_images.device
+    )
     err = 1
 
     # build the convolution operator
     # this is equivalent to blurring on horizontal then vertical directions, unlike a traditional 2d Gaussian filter
     if conv_operator is None:
-        if A.shape[1] != A.shape[2]:
-            t = torch.linspace(0, 1, A.shape[1]).to(A.device)
+        if hist_images.shape[1] != hist_images.shape[2]:
+            t = torch.linspace(0, 1, hist_images.shape[1]).to(hist_images.device)
             [Y, X] = torch.meshgrid(t, t)
             K1 = torch.exp(-((X - Y) ** 2) / reg)
 
-            t = torch.linspace(0, 1, A.shape[2]).to(A.device)
+            t = torch.linspace(0, 1, hist_images.shape[2]).to(hist_images.device)
             [Y, X] = torch.meshgrid(t, t)
             K2 = torch.exp(-((X - Y) ** 2) / reg)
 
         else:
-            t = torch.linspace(0, 1, A.shape[1]).to(A.device)
+            t = torch.linspace(0, 1, hist_images.shape[1]).to(hist_images.device)
             [Y, X] = torch.meshgrid(t, t)
             K1 = torch.exp(-((X - Y) ** 2) / reg)
     else:
@@ -120,39 +128,40 @@ def convolutional_wasserstein_barycenter_2d(
     if conv_method != "simple":
         raise NotImplementedError("Only simple 1D convolutions are implemeted.")
 
-    if A.shape[1] == A.shape[2]:
-        KU = convol_imgs(U, K1, K1)
+    if hist_images.shape[1] == hist_images.shape[2]:
+        KU = convolve_images(U, K1, K1)
     else:
-        KU = convol_imgs(U, K1, K2)
-    for ii in range(numItermax):
-        V = bar[None] / (KU + small_constant)
-        if A.shape[1] == A.shape[2]:
-            KV = convol_imgs(V, K1, K1)
-        else:
-            KV = convol_imgs(V, K1, K2)
+        KU = convolve_images(U, K1, K2)
 
-        U = A / (KV + small_constant)
-        if A.shape[1] == A.shape[2]:
-            KU = convol_imgs(U, K1, K1)
+    for ii in range(max_iterations):
+        V = bar[None] / (KU + small_constant)
+        if hist_images.shape[1] == hist_images.shape[2]:
+            KV = convolve_images(V, K1, K1)
         else:
-            KU = convol_imgs(U, K1, K2)
+            KV = convolve_images(V, K1, K2)
+
+        U = hist_images / (KV + small_constant)
+        if hist_images.shape[1] == hist_images.shape[2]:
+            KU = convolve_images(U, K1, K1)
+        else:
+            KU = convolve_images(U, K1, K2)
         bar = torch.exp(
             torch.sum(weights[:, None, None] * torch.log(KU + small_constant), dim=0)
         )
         if ii % 10 == 9:
             err = torch.sum(torch.std(V * KU, dim=0))
 
-            if err < stopThr:
+            if err < threshold:
                 break
         return bar
 
 
 def convolutional_wasserstein_barycenter_pt_cloud(
-    A,
+    hist_clouds,
     reg=None,
     weights=None,
-    numItermax=10000,
-    stopThr=1e-4,
+    max_iterations=10000,
+    threshold=1e-4,
     conv_method="simple",
     conv_operator=None,
     return_log=False,
@@ -173,15 +182,15 @@ def convolutional_wasserstein_barycenter_pt_cloud(
     as proposed in :ref:`[21] <references-convolutional-barycenter-2d>`
     Parameters
     ----------
-    A : array-like, shape (n_hists, width, height, depth)
+    hist_clouds : array-like, shape (n_hists, width, height, depth)
         `n` distributions (3D point clouds) of size `width` x `height x depth`.  A cube, i.e [-1,1]^3 is binned into subcubes and the point cloud is placed in the cube.
     reg : float
         Regularization term >0
     weights : array-like, shape (n_hists,)
         Weights of each image on the simplex (barycentric coodinates)
-    numItermax : int, optional
+    max_iterations : int, optional
         Max number of iterations
-    stopThr : float, optional
+    threshold : float, optional
         Stop threshold on error (> 0)
     conv_method : str, optional, default='simple'
         type of method to be used to compute the action of the kernel on a matrix
@@ -211,16 +220,18 @@ def convolutional_wasserstein_barycenter_pt_cloud(
     """
 
     if weights is None:
-        weights = (torch.ones(A.shape[0]) / A.shape[0]).to(A.device)
+        weights = (torch.ones(hist_clouds.shape[0]) / hist_clouds.shape[0]).to(
+            hist_clouds.device
+        )
     else:
-        assert len(weights) == A.shape[0]
+        assert len(weights) == hist_clouds.shape[0]
 
     if reg is None and conv_operator is None:
         raise ValueError(
             "At least one of the regularizer or conv_operator must be given"
         )
 
-    n_hists, width, _, _ = A.shape
+    n_hists, width, _, _ = hist_clouds.shape
 
     # build the convolution operator
     # this is equivalent to blurring on horizontal then vertical directions.
@@ -229,24 +240,26 @@ def convolutional_wasserstein_barycenter_pt_cloud(
         M = (grid[:, None] - grid[None, :]) ** 2
         conv_operator = torch.exp(-M / reg)
 
-    b = torch.ones_like(A, requires_grad=False)
-    q = torch.ones((width, width, width), device=A.device, dtype=A.dtype)
+    b = torch.ones_like(hist_clouds, requires_grad=False)
+    q = torch.ones(
+        (width, width, width), device=hist_clouds.device, dtype=hist_clouds.dtype
+    )
 
     if conv_method != "simple":
         raise NotImplementedError("Only 1D convolutions are supported")
 
-    Kb = convol_clouds(b, conv_operator)
+    Kb = convolve_clouds(b, conv_operator)
 
     log = {"err": [], "a": [], "b": [], "q": []}
     err = 1
 
-    for ii in range(numItermax):
+    for ii in range(max_iterations):
         if torch.isnan(q).any():
             break
 
         q_old = q.clone()
-        a = A / Kb
-        Ka = convol_clouds(a, conv_operator.t())
+        a = hist_clouds / Kb
+        Ka = convolve_clouds(a, conv_operator.t())
         q = torch.exp(
             torch.sum(
                 weights[:, None, None, None] * torch.log(Ka + small_constant), dim=0
@@ -254,10 +267,10 @@ def convolutional_wasserstein_barycenter_pt_cloud(
         )
         Q = q[None, :]
         b = Q / Ka
-        Kb = convol_clouds(b, conv_operator)
+        Kb = convolve_clouds(b, conv_operator)
         err = torch.abs(q - q_old).max()
 
-        if err < stopThr and ii > 10:
+        if err < threshold and ii > 10:
             break
     print("Barycenter 3d | err = ", err)
 
@@ -267,7 +280,7 @@ def convolutional_wasserstein_barycenter_pt_cloud(
         log["q"] = q
         log["b"] = b
 
-    if ii == numItermax - 1:
+    if ii == max_iterations - 1:
         warnings.warn("*** Maxiter reached ! err = {} ***".format(err))
 
     if return_log:
@@ -292,17 +305,17 @@ def create_gaussian_kernel_window(window_size, sigma=None) -> torch.Tensor:
         sigmas_per_pixel = 1.5
         sigma = 0.5 * (window_size - 1) / sigmas_per_pixel
 
-    gauss_ker = torch.tensor(
+    gaussian_kernel = torch.tensor(
         [
-            math.exp(-((x - 0.5 * (window_size - 1)) ** 2) / float(2 * sigma**2))
+            math.exp(-((x - 0.5 * (window_size - 1)) ** 2) / float(2 * sigma ** 2))
             for x in range(window_size)
         ],
         dtype=torch.float,
         requires_grad=False,
     )
-    gauss_ker = (gauss_ker / gauss_ker.sum()).unsqueeze(1)
+    gaussian_kernel = (gaussian_kernel / gaussian_kernel.sum()).unsqueeze(1)
 
-    return gauss_ker
+    return gaussian_kernel
 
 
 def wasserstein_distance(mu0, mu1, sigma, window_size, max_iter, threshold=1e-5):
@@ -325,7 +338,7 @@ def wasserstein_distance(mu0, mu1, sigma, window_size, max_iter, threshold=1e-5)
             "There is a shape mismatch error. The output shape is [1,n+1] for a given input tensor of shape [1,n] "
         )
 
-    gamma = sigma**2
+    gamma = sigma ** 2
 
     err = 1
     a = 1.0 / mu0.shape[-1]
