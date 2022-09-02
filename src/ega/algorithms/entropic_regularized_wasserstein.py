@@ -70,14 +70,19 @@ class SinkhornDistance(torch.nn.Module):
             u1 = u  # useful to check the update
             u = (
                 self.eps
-                * (torch.log(mu + 1e-8) - torch.logsumexp(self.M(C, u, v), dim=-1))
+                * (
+                    torch.log(mu + 1e-8)
+                    - torch.logsumexp(self.modified_cost(C, u, v), dim=-1)
+                )
                 + u
             )  # TODO: add this in the code instead of hardcoding it like this
             v = (
                 self.eps
                 * (
                     torch.log(nu + 1e-8)
-                    - torch.logsumexp(self.M(C, u, v).transpose(-2, -1), dim=-1)
+                    - torch.logsumexp(
+                        self.modified_cost(C, u, v).transpose(-2, -1), dim=-1
+                    )
                 )
                 + v
             )
@@ -89,7 +94,7 @@ class SinkhornDistance(torch.nn.Module):
 
         U, V = u, v
         # Transport plan pi = diag(a)*K*diag(b)
-        pi = torch.exp(self.M(C, U, V))
+        pi = torch.exp(self.modified_cost(C, U, V))
         # Sinkhorn distance
         cost = torch.sum(pi * C, dim=(-2, -1))
 
@@ -100,7 +105,7 @@ class SinkhornDistance(torch.nn.Module):
 
         return cost, pi, C
 
-    def M(self, C, u, v):
+    def modified_cost(self, C, u, v):
         """
         Modified cost for logarithmic updates
         $M_{ij} = (-c_{ij} + u_i + v_j) / \epsilon$
