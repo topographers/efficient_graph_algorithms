@@ -1,102 +1,59 @@
-import argparse
 import trimesh
-import os
 import numpy as np
-import torch
-from distutils.util import strtobool
 import random
-import open3d as o3d
+
+import os
+import sys  
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../../", "src")))  
 
 from ega.algorithms.brute_force import BruteForce
 from ega.util.gaussian_kernel import GaussianKernel
+import ega.util.mesh_utils as mu
 from ega.evaluation.evaluator import Evaluator
 
+import scipy
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import shortest_path
 
-def get_args_parser():
-    parser = argparse.ArgumentParser('gaussian_kernel_test', add_help=False)
-
-    # Model parameters
-    parser.add_argument('--object_folder', default='./curvox_dataset/meshes/ycb/014_lemon', type=str,
-                        help="""path for sample data.""")
-
-    parser.add_argument('--cuda', type=lambda x: bool(strtobool(x)), default=False, nargs='?', const=True,
-                        help='if toggled, cuda will not be enabled by default')
-    parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--seed', type=int, default=1, help='seed of the experiment')
-    parser.add_argument('--torch_deterministic', type=lambda x: bool(strtobool(x)), default=True, nargs='?', const=True,
-                        help='if toggled, `torch.backends.cudnn.deterministic=False`')
-    parser.add_argument('--visualize_mesh', type=lambda x: bool(strtobool(x)), default=False, nargs='?', const=True,
-                        help='whether or not to visualize meshes in open3d')
-
-    parser.add_argument('--method', default='BruteForce', type=str,
-                        help="""select method to do graph multiplication """)
-    parser.add_argument('--kernel', default='GaussianKernel', type=str, help="""select a kernel or function for f""")
-    parser.add_argument('--sigma', default=0.1, type=str,
-                        help="""a scalar used in gaussian kernel. exp(- sigma * dist(i,j))""")
-    parser.add_argument('--use_fp16', type=lambda x: bool(strtobool(x)), default=False,
-                        help="""if this is set as True, then we will use torch.float32, otherwise, torch.float64""")
-    return parser
+from memory_profiler import profile
+from line_profiler import LineProfiler 
+import networkx 
 
 
-def main():
-    print("Initial version 0")
+@profile
+def evaluate_brute_force_memory(adjacency_lists, kernel_function, graph_field):
+    brute_force = BruteForce(adjacency_lists, kernel_function)
+    Mx = brute_force.model_top_field(graph_field)
 
-    parser = argparse.ArgumentParser('TopoGrapher', parents=[get_args_parser()])
-
-    args = parser.parse_args()
-
-    """
-    args = parser.parse_args(['--object_folder','./curvox_dataset/meshes/ycb/014_lemon', 
-                              '--method', 'BruteForce',
-                              '--kernel','GaussianKernel',
-                              '--cuda', 'False',
-                              '--visualize_mesh',
-                              ])
-    """
-
-    # set device and seed
-    device = torch.device('cuda' if torch.cuda.is_available() and args.cuda else 'cpu')
-    if device == torch.device(type='cuda'):
-        torch.cuda.set_device(args.gpu)
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.backends.cudnn.deterministic = args.torch_deterministic
-
-    # load ycb data
-    dtype = torch.float32 if args.use_fp16 else torch.float64
-    object_mesh_path = os.path.join(args.object_folder, 'textured.obj')
-    mesh = torch.FloatTensor(trimesh.load(object_mesh_path).vertices).to(
-        device) if args.use_fp16 else torch.DoubleTensor(trimesh.load(object_mesh_path).vertices).to(device)
-
-    # visualization of meshes
-    if args.visualize_mesh:
-        pcd = o3d.io.read_triangle_mesh(object_mesh_path)
-        o3d.visualization.draw_geometries([pcd], mesh_show_wireframe=True)
-
-    # initialize evaluator
-    evaluator = Evaluator(device=device, f=args.kernel, method=args.method)
-
-    # start graph multiplication
-
-    num_pts = mesh.shape[0]
-    x = torch.randn(size=(num_pts, 10), dtype=dtype).to(device)  # generate a random feature matrix
-
-    if args.kernel == 'GaussianKernel':
-        f = GaussianKernel(0.1)
-    else:
-        print("TODO")
-
-    if args.method == 'BruteForce':
-        M = torch.cdist(mesh.unsqueeze(0), mesh.unsqueeze(0)).squeeze(0).to(device)
-
-        calculator = BruteForce(device, evaluator)
-        Mx = calculator(f, M, x)
-    else:
-        print("TODO")
-
-    evaluator.print_statistics()
+def evaluate_brute_force_time(adjacency_lists, kernel_function, graph_field):
+    brute_force = BruteForce(adjacency_lists, kernel_function)
+    Mx = brute_force.model_top_field(graph_field)
 
 
 if __name__ == '__main__':
-    main()
+
+    # load sample mesh data 
+    default_curvox_dataset_path = os.path.abspath(os.path.join("../../", "data", "curvox_dataset"))
+    mesh_file = os.path.join(default_curvox_dataset_path, "meshes/ycb/014_lemon", 'nontextured.stl')
+    mesh = trimesh.load(mesh_file)
+    graph = trimesh.graph.vertex_adjacency_graph(mesh)
+    print(graph)
+
+    # proprocess 
+    adjacency_lists = mu.trimesh_to_adjacency_matrices(mesh, seed=0)  
+    n_vertices = mesh.vertices.shape[0]
+    kernel_function = GaussianKernel(0.1)
+    graph_field = np.random.randn(n_vertices, 1)
+
+    # evaluate memory 
+    evaluate_brute_force_memory(adjacency_lists, kernel_function, graph_field)
+
+    # evaluate time
+    lp = LineProfiler()
+    lp_wrapper = lp(evaluate_brute_force_time)
+    lp_wrapper(adjacency_lists, kernel_function, graph_field)
+    lp.print_stats()
+   
+
+
+
