@@ -1,37 +1,56 @@
-from torch import nn
-from memory_profiler import profile
+#from torch import nn
+from .top_field_modeler import TopFieldModeler
+
+import os 
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../../", "src"))) 
+
+import ega.util.mesh_utils as mu
+
+import time
+import numpy as np 
+from scipy.sparse.csgraph import shortest_path
 
 
-class BruteForce(nn.Module):
+class BruteForce(TopFieldModeler):
+    
     """
-    some definitions:
-        n: number of points in the graph
-        d: feature vector dimension for each point in the graph
-
     inputs:
-        f: a function that applies to each entry of the distance matrix.
-        x: n by d feature matrix. Each row represents the feature vector of a point in the graph.
-
+        adjacency_lists: list of lists with the i^th list containing the indices of vertex i's neighbors.
+        kernel_function: f: R -> R is a fixed function applied elementwise on top of the similarity matrix 
+                         calculated from teh adjacency_lists.
+       
     class description:
-        this BruteForce class takes function f and feature matrix x, and outputs: Mx,
-        where M[i,j] = f(dist(i,j))
+        Given the adjacency_lists, the constructor computes the shortest path distance matrix (M) explicitly.
+        The shortest path is calculated with scipy.sparse.csgraph.shortest_path function: https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csgraph.shortest_path.html
+        We can also specify explicitly the method to calculate shortest path algorithm in the constructor
+        
+        model_top_field: takes the kernel_function f and graph_field x, and outputs Mx, where M[i,j] = f(dist(i,j))
     """
-    def __init__(self, device, evaluator):
-        super(BruteForce, self).__init__()
-        self.device = device
-        self.evaluator = evaluator
+    
+    def __init__(self, adjacency_lists, kernel_function, shortest_path_algorithm='auto'):
+  
+        self.shortest_path_algorithm = shortest_path_algorithm 
+        self.kernel_function = kernel_function
 
-    @profile
-    def forward(self, f, M, x):
+        self.distance_matrix = self.generate_shortest_path_matrix(adjacency_lists)
+        
+    def generate_shortest_path_matrix(self, adjacency_lists):
+        
+        sparse_adjacency_matrix = mu.adjacency_list_to_sparse_matrix(adjacency_lists)
+        dist_matrix = shortest_path(csgraph=sparse_adjacency_matrix, directed=False, method=self.shortest_path_algorithm)
+        
+        return dist_matrix
 
-        self.evaluator.start_time()
-
-        Mx =  f(M) @ x
-
-        self.evaluator.stop_time()
-        self.evaluator.record_memory_consumption(Mx)
-
+    def model_top_field(self, graph_field):
+        
+        assert self.distance_matrix.shape[1] == graph_field.shape[0], "Dimention Mismatch Error: the first dimension of graph_field should be the same as the number of vertices in distance_matrix"
+        
+        # if graph_field has dimension 1 and is of shape (n,), we expand it into 2 dim numpy array with shape (n, 1)
+        if graph_field.ndim ==1 and graph_field.shape[0] == self.distance_matrix.shape[1]:
+            graph_field = np.expand_dims(graph_field, axis = 1)
+        
+        Mx = np.matmul(self.kernel_function(self.distance_matrix), graph_field)
         return Mx
 
-
-
+        
