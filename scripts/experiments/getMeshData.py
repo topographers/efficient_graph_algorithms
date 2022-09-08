@@ -2,25 +2,6 @@ import numpy as np
 import scipy.sparse as sps
 import scipy.linalg as splinalg
 
-def readOff(filepath):
-    input_list = []
-    with open(filepath) as infile:
-        for line in infile:
-            input_list.append(line.strip().split())
-    infile.close()
-
-    if input_list[0][0] != 'OFF':
-        print('not a valid off file!')
-    nx = int(input_list[1][0])
-    nt = int(input_list[1][1])
-    X = input_list[2:2+nx]
-    X = np.array(X).astype(float)
-
-    T = input_list[2+nx:]
-    T = np.array(T).astype(int)
-    T = T[:,1:] # matlab code has "+1" here because matlab index starts with 1
-    return X, T
-
 def cotLaplacian(X, T):
     # Find orig edge lengths and angles
     nv = len(X); nf = len(T)

@@ -1,9 +1,9 @@
 import argparse
 import numpy as np
-import pdb
 import getMeshData
 import blurOnMesh
 from convolutionalBarycenter import convolutionalBarycenter
+import trimesh
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Convbarycenter Argument Parser')
@@ -15,8 +15,11 @@ def parse_arguments():
     return parser.parse_args()
  
 if __name__ == '__main__':
-    filepath = r'C:\Users\yunfan\Desktop\topography\2015-SIGGRAPH-convolutional-ot-master\2015-SIGGRAPH-convolutional-ot-master\data\meshes\moomoo_s0.off'
-    X, T = getMeshData.readOff(filepath)
+    # object_mesh_path = r'C:\Users\yunfan\Desktop\topography\2015-SIGGRAPH-convolutional-ot-master\2015-SIGGRAPH-convolutional-ot-master\data\meshes\moomoo_s0.obj'
+    object_mesh_path = r'C:\Users\yunfan\Desktop\topography\2015-SIGGRAPH-convolutional-ot-master\2015-SIGGRAPH-convolutional-ot-master\data\meshes\hand1.obj'
+    mesh = trimesh.load(object_mesh_path)
+    X = mesh.vertices; T = mesh.faces
+    
     W, A = getMeshData.cotLaplacian(X, T)
     M = getMeshData.getMeshData(X, T, 10)
     
@@ -28,7 +31,7 @@ if __name__ == '__main__':
 
     # Design a few functions to average
 
-    centerVerts = [300, 100, 600]
+    centerVerts = [300, 100, 600] # want to adjust this numbers if the input data has less than 600 vertices
     nFunctions = len(centerVerts)
     distributions = np.zeros((M.numVertices,nFunctions))
     areaweight_np = np.array(M.areaWeights.todense()).T[0]
@@ -56,4 +59,3 @@ if __name__ == '__main__':
     alpha = np.ones(3)
     barycenter, _ = convolutionalBarycenter(distributions,alpha,M.areaWeights,blur,blurTranspose,options)
     print(barycenter)
-
