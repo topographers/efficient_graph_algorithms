@@ -36,6 +36,8 @@ def convolutional_wasserstein_barycenter_2d(
     threshold=1e-4,
     conv_method="simple",
     conv_operator=None,
+    iter_every=10,
+    first_check=9,
 ):
     r"""Compute the entropic regularized wasserstein barycenter of distributions :math:`\mathbf{A}`
     where :math:`\mathbf{A}` is a collection of 2D images.
@@ -67,7 +69,10 @@ def convolutional_wasserstein_barycenter_2d(
         type of method to be used to compute the action of the kernel on a matrix
     conv_operator : Tuple(float, float) or float, optional.
         The matrix to be used for convolutions.
-
+    iter_every : int, optional
+        Check for errors in Sinkhorn convergence after every x number of iterations
+    first_check : int, optional
+        The first time the convergence for Sinkhorn iterations is tested
     Returns
     -------
     a : array-like, shape (width, height)
@@ -148,7 +153,7 @@ def convolutional_wasserstein_barycenter_2d(
         bar = torch.exp(
             torch.sum(weights[:, None, None] * torch.log(KU + small_constant), dim=0)
         )
-        if ii % 10 == 9:
+        if ii % iter_every == first_check:
             err = torch.sum(torch.std(V * KU, dim=0))
 
             if err < threshold:
@@ -307,7 +312,7 @@ def create_gaussian_kernel_window(window_size, sigma=None) -> torch.Tensor:
 
     gaussian_kernel = torch.tensor(
         [
-            math.exp(-((x - 0.5 * (window_size - 1)) ** 2) / float(2 * sigma ** 2))
+            math.exp(-((x - 0.5 * (window_size - 1)) ** 2) / float(2 * sigma**2))
             for x in range(window_size)
         ],
         dtype=torch.float,
@@ -318,11 +323,26 @@ def create_gaussian_kernel_window(window_size, sigma=None) -> torch.Tensor:
     return gaussian_kernel
 
 
-def wasserstein_distance(mu0, mu1, sigma, window_size, max_iter, threshold=1e-5):
+def wasserstein_distance(
+    mu0, mu1, sigma, window_size, max_iter, threshold=1e-5, iter_every=10, first_check=9
+):
     """
-    mu0, mu1: The source and target distributions
-    sigma (float) : controls the accuracy of the Sinkhorn iteration. Smaller is better but will require more iterations to converge
-    window_size (int) : window_sizes for the 1d Gaussian kernel matrix
+    Args:
+    mu0, mu1 : n-array
+        The source and target distributions
+    sigma : float
+        Controls the accuracy of the Sinkhorn iteration. Smaller is better but will require more iterations to converge
+    window_size : int
+        window_sizes for the 1d Gaussian kernel matrix
+    max_iter : int
+        Maximum number of Sinkhorn iterations
+    threshold : float
+        Stop threshold on error (> 0)
+    iter_every : int, optional
+        Check for errors in Sinkhorn convergence after every x number of iterations
+    first_check : int, optional
+        The first time the convergence for Sinkhorn iterations is tested
+
     Returns: Convolutional wasserstein distance between the two distributions
     """
 
@@ -338,7 +358,7 @@ def wasserstein_distance(mu0, mu1, sigma, window_size, max_iter, threshold=1e-5)
             "There is a shape mismatch error. The output shape is [1,n+1] for a given input tensor of shape [1,n] "
         )
 
-    gamma = sigma ** 2
+    gamma = sigma**2
 
     err = 1
     a = 1.0 / mu0.shape[-1]
@@ -355,7 +375,7 @@ def wasserstein_distance(mu0, mu1, sigma, window_size, max_iter, threshold=1e-5)
 
         d = gamma * (a * (mu0 * v.log() + mu1 * w.log())).sum()
 
-        if i % 10 == 9:
+        if i % iter_every == first_check:
             err = (v - v1).abs().sum(-1).mean() + (w - w1).abs().sum(-1).mean()
 
             if err.item() < threshold:
