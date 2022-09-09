@@ -1,20 +1,20 @@
 import numpy as np
 
 
-def blurOnMesh(signal,M,time,steps,transpose=0):
-    h = time/steps
-    areaweight_np = np.array(M.areaWeights.todense()).T[0]
-    blurInverse = np.diag(areaweight_np) - h*M.cotLaplacian
+def blur_on_mesh(signal: float, mesh_dictionary: dict, time: float,
+                 steps: int, transpose = 0):
+    area_weight_np = np.array(mesh_dictionary['area_weights'].todense()).T[0]
+    blur_inverse = np.diag(area_weight_np) - time / steps * mesh_dictionary['cot_laplacian']
     result = signal
     if not transpose:
         for _ in range(steps):
             # solve system of equations
-            result = np.linalg.solve(blurInverse,
-                     np.multiply(result.T, areaweight_np).T)
+            result = np.linalg.solve(blur_inverse,
+                     np.multiply(result.T, area_weight_np).T)
     else:
         for _ in range(steps):
-            result = np.multiply(areaweight_np,
-                     np.linalg.solve(blurInverse.T, result).T).T
+            result = np.multiply(area_weight_np,
+                     np.linalg.solve(blur_inverse.T, result).T).T
     return result
 
 

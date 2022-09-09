@@ -1,53 +1,56 @@
 import argparse
 import numpy as np
-import getMeshData
-import blurOnMesh
-from convolutionalBarycenter import convolutionalBarycenter
+from getMeshData import get_mesh_data
+from blurOnMesh import blur_on_mesh
+from convolutionalBarycenter import convolutional_barycenter
 import trimesh
+import pdb
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='Convbarycenter Argument Parser')
-    parser.add_argument('--niter', dest='niter', type=int, default=1500)
-    parser.add_argument('--tol', dest='tol', type=float, default=1e-7)
-    parser.add_argument('--verb', dest='verb', type=int, default=1)
-    parser.add_argument('--disp_rate', dest='disp_rate', type=int, default=10)
-    parser.add_argument('--initial_v', dest='initial_v', type=float, default=3e-4)
-    return parser.parse_args()
+def get_args_parser():
+    parser = argparse.ArgumentParser('convbarycenter', add_help=False)
+    parser.add_argument('--niter', dest='niter', type=int, default=1500,
+                        help="""number of iterations""")
+    parser.add_argument('--tol', dest='tol', type=float, default=1e-7,
+                        help="""stopping tolerance""")
+    parser.add_argument('--verb', dest='verb', type=int, default=1,
+                        help="""if set to 1, print information at each iteration""")
+    parser.add_argument('--filepath', dest='filepath', type=str, default='./curvox_dataset/meshes/ycb/014_lemon',
+                        help="""path for sample data.""")
+    return parser
  
-if __name__ == '__main__':
+def main():
+    parser = argparse.ArgumentParser('TopoGrapher', parents=[get_args_parser()])
+    args = parser.parse_args()
+
     # object_mesh_path = r'C:\Users\yunfan\Desktop\topography\2015-SIGGRAPH-convolutional-ot-master\2015-SIGGRAPH-convolutional-ot-master\data\meshes\moomoo_s0.obj'
     object_mesh_path = r'C:\Users\yunfan\Desktop\topography\2015-SIGGRAPH-convolutional-ot-master\2015-SIGGRAPH-convolutional-ot-master\data\meshes\hand1.obj'
     mesh = trimesh.load(object_mesh_path)
-    X = mesh.vertices; T = mesh.faces
+    mesh_dictionary = get_mesh_data(mesh.vertices, mesh.faces, 10)
     
-    W, A = getMeshData.cotLaplacian(X, T)
-    M = getMeshData.getMeshData(X, T, 10)
-    
-    blurTime = .001 # if this gets too small, distances get noisy
-    blurSteps = 3
+    blur_time = .001 # if this gets too small, distances get noisy
+    blur_steps = 3
 
-    blur = lambda x: blurOnMesh.blurOnMesh(x,M,blurTime,blurSteps)
-    blurTranspose = lambda x: blurOnMesh.blurOnMesh(x,M,blurTime,blurSteps,1)
+    blur = lambda x: blur_on_mesh(x,mesh_dictionary,blur_time,blur_steps)
+    blur_transpose = lambda x: blur_on_mesh(x,mesh_dictionary,blur_time,blur_steps,1)
 
     # Design a few functions to average
 
-    centerVerts = [300, 100, 600] # want to adjust this numbers if the input data has less than 600 vertices
-    nFunctions = len(centerVerts)
-    distributions = np.zeros((M.numVertices,nFunctions))
-    areaweight_np = np.array(M.areaWeights.todense()).T[0]
+    center_verts = [300, 100, 600] # want to adjust this numbers if the input data has less than 600 vertices
+    n_functions = len(center_verts)
+    distributions = np.zeros((mesh_dictionary['num_vertices'],n_functions))
+    area_weight_np = np.array(mesh_dictionary['area_weights'].todense()).T[0]
 
-    for i in range(nFunctions):
-        distributions[centerVerts[i]-1,i] = 1 / areaweight_np[centerVerts[i]-1]
+    for i in range(n_functions):
+        distributions[center_verts[i]-1,i] = 1 / area_weight_np[center_verts[i]-1]
         # index - 1 because matlab index starts at 1
-        distributions[:,i] =  blurOnMesh.blurOnMesh(
-            distributions[:,i],M,blurTime,blurSteps)
+        distributions[:,i] =  blur_on_mesh(
+            distributions[:,i],mesh_dictionary,blur_time,blur_steps)
 
     options={}
-    options['niter'] = 1500
-    options['tol'] = 1e-7
-    options['verb'] = 1
+    options['niter'] = args.niter # 1500
+    options['tol'] = args.tol # 1e-7
+    options['verb'] = args.verb # 1
     options['disp'] = []
-    options['disp_rate'] = 10
     options['initial_v'] = np.ones(distributions.shape)
     options['initial_barycenter'] = np.ones((distributions.shape[0], 1))
     options['unit_area_projection'] = 0
@@ -57,5 +60,8 @@ if __name__ == '__main__':
 
 
     alpha = np.ones(3)
-    barycenter, _ = convolutionalBarycenter(distributions,alpha,M.areaWeights,blur,blurTranspose,options)
+    barycenter, _ = convolutional_barycenter(distributions,alpha,mesh_dictionary['area_weights'],blur,blur_transpose,options)
     print(barycenter)
+
+if __name__ == '__main__':
+    main()
