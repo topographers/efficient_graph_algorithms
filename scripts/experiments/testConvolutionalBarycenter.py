@@ -5,6 +5,8 @@ from blurOnMesh import blur_on_mesh
 from convolutionalBarycenter import convolutional_barycenter
 import trimesh
 import pdb
+import os
+
 
 def get_args_parser():
     parser = argparse.ArgumentParser('convbarycenter', add_help=False)
@@ -14,7 +16,7 @@ def get_args_parser():
                         help="""stopping tolerance""")
     parser.add_argument('--verb', dest='verb', type=int, default=1,
                         help="""if set to 1, print information at each iteration""")
-    parser.add_argument('--filepath', dest='filepath', type=str, default='./curvox_dataset/meshes/ycb/014_lemon',
+    parser.add_argument('--object_folder', dest='object_folder', type=str, default='./Solomon_2015/meshes',
                         help="""path for sample data.""")
     return parser
  
@@ -22,8 +24,7 @@ def main():
     parser = argparse.ArgumentParser('TopoGrapher', parents=[get_args_parser()])
     args = parser.parse_args()
 
-    # object_mesh_path = r'C:\Users\yunfan\Desktop\topography\2015-SIGGRAPH-convolutional-ot-master\2015-SIGGRAPH-convolutional-ot-master\data\meshes\moomoo_s0.obj'
-    object_mesh_path = r'C:\Users\yunfan\Desktop\topography\2015-SIGGRAPH-convolutional-ot-master\2015-SIGGRAPH-convolutional-ot-master\data\meshes\hand1.obj'
+    object_mesh_path = os.path.join(args.object_folder, 'moomoo_s0.obj')
     mesh = trimesh.load(object_mesh_path)
     mesh_dictionary = get_mesh_data(mesh.vertices, mesh.faces, 10)
     

@@ -6,17 +6,23 @@ def cotangent_laplacian(vertices: float, faces: int):
     # Find orig edge lengths and angles
     num_vertices = len(vertices)
     num_faces = len(faces)
-    # note index changes below, because matlab index starts with 1
+
+    '''
+
+    L1, L2, L3 are vectors contaning length of edges in faces.
+    L1[i], L2[i], L3[i] correspond to length of edges in face i.
+
+    '''
     L1 = np.linalg.norm(vertices[faces[:,1],:]-vertices[faces[:,2],:], axis=1) 
     L2 = np.linalg.norm(vertices[faces[:,0],:]-vertices[faces[:,2],:], axis=1)
     L3 = np.linalg.norm(vertices[faces[:,0],:]-vertices[faces[:,1],:], axis=1)
 
-    """
+    '''
 
-    explain what each of these intermediates are derived from
+    A is a 2d-array containing angles of triangles. Each row in A sum to \pi.
+    Angles are computed using cosine rule.
 
-    """
-    
+    '''
     EL = np.array([L1,L2,L3]).T
     A1 = (L2**2 + L3**2 - L1**2) / (2*L2*L3)
     A2 = (L1**2 + L3**2 - L2**2) / (2*L1*L3)
@@ -24,7 +30,12 @@ def cotangent_laplacian(vertices: float, faces: int):
     A = [A1,A2,A3]
     A = np.arccos(A).T
 
-    # The Cot Laplacian 
+    '''
+
+    S is a vector containing the cotangent of angles in all the faces.
+    I and J are vectors containing the indices of vertices in faces. 
+    
+    '''
     I = np.concatenate((faces[:,0], faces[:,1], faces[:,2]))
     J = np.concatenate((faces[:,1], faces[:,2], faces[:,0]))
     S = 0.5 / np.tan(np.concatenate([A[:,2],A[:,0],A[:,1]]))
