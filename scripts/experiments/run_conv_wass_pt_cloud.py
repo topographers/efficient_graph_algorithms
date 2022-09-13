@@ -14,6 +14,7 @@ from ega.algorithms.convolutional_wass import (
     convol_clouds,
     convolutional_wasserstein_barycenter_pt_cloud,
 )
+from ega.visualization.point_cloud_visualization import render_pointcloud_still_np
 
 
 def get_args_parser():
@@ -126,7 +127,7 @@ def main():
 
     ##### set up histograms and create empirical distributions #####
 
-    n_features = args.width ** 3
+    n_features = args.width**3
 
     hist_grid = torch.linspace(-1.0, 1.0, args.width + 1)
     grid = torch.linspace(-1.0, 1.0, args.width)
@@ -169,7 +170,22 @@ def main():
         with open(args.save_file, "wb") as ff:
             pickle.dump(data, ff)
 
+    # VISUALIZE THESE OBJECTS and save them as png.
 
-# TODO : VISUALIZE THESE OBJECTS. NEED HELP
+    for key in ["ibp"]:
+        bars = data[key]["bars"]
+        for ii, hist in enumerate(bars):
+            print("->> creating mesh {} ... ".format(ii + 1))
+            support = torch.where(hist > args.error)
+            weights = hist[support].numpy()
+            cloud = torch.stack((X[support], Y[support], Z[support])).t()
+            render_pointcloud_still_np(
+                cloud.numpy(),
+                "test_interpolation" + str(ii) + ".png",
+                scale_points=False,
+                camera_position=(2.2, 2.2, 2.2),
+            )
+
+
 if __name__ == "__main__":
     main()
