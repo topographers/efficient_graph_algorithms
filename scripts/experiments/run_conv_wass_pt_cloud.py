@@ -19,7 +19,7 @@ from ega.visualization.point_cloud_visualization import render_pointcloud_still_
 
 def get_args_parser():
     parser = argparse.ArgumentParser(
-        "Convolutional_wasserstein_point_cloud_test", add_help=False
+        "convolutional_wasserstein_point_cloud_test", add_help=False
     )
 
     # Model parameters
@@ -146,13 +146,13 @@ def main():
     hists /= hists.sum(axis=(1, 2, 3))[:, None, None, None]
     hists = torch.tensor(hists).type(torch.float32)
     hists = hists.to(device)
-    ws = [0.0, 0.25, 0.5, 0.75, 1.0]  # interpolating points
+    interpolating_points = [0.0, 0.25, 0.5, 0.75, 1.0]  # interpolating points
 
     ################################
 
     data = dict(ibp=dict(times=[], bars=[]))
     bars = []
-    for ii, w in enumerate(ws):
+    for ii, w in enumerate(interpolating_points):
         print("->>> Doing weight {} ... ".format(ii + 1))
         weights = torch.tensor([1.0 - w, w])
         t0 = time()
