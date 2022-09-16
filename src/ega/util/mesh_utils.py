@@ -54,17 +54,17 @@ def trimesh_to_adjacency_matrices(mesh, seed=0):
     return random_circular_rotation(adjacency_lists, seed)
 
 
-def adjacency_list_to_sparse_matrix(adjacency_lists):
-    I = []
-    J = []
+def adjacency_list_to_sparse_matrix(adjacency_lists: list[list[int]]):
+    row_idx_list = []
+    rwo_content_list = []
     for i_idx, i_list in enumerate(adjacency_lists):
         for j_value in i_list:
-            I.append(i_idx)
-            J.append(j_value)
-    n_vertices = I[-1] + 1
-    V = [1] * len(I)
+            row_idx_list.append(i_idx)
+            rwo_content_list.append(j_value)
+    n_vertices = row_idx_list[-1] + 1
+    V = [1] * len(row_idx_list)
 
-    sparse_adjacency_matrix = scipy.sparse.coo_matrix((V,(I,J)),shape=(n_vertices,n_vertices))
+    sparse_adjacency_matrix = scipy.sparse.coo_matrix((V,(row_idx_list,rwo_content_list)),shape=(n_vertices,n_vertices))
     return sparse_adjacency_matrix  
 
 

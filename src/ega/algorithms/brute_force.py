@@ -1,12 +1,9 @@
 #from torch import nn
-from .top_field_modeler import TopFieldModeler
-
-import os 
-import sys
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../../", "src"))) 
 
 import ega.util.mesh_utils as mu
+from ega.algorithms.top_field_modeler import TopFieldModeler
 
+import os 
 import time
 import numpy as np 
 from scipy.sparse.csgraph import shortest_path

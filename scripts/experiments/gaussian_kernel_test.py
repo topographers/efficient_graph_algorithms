@@ -1,10 +1,7 @@
 import trimesh
 import numpy as np
 import random
-
 import os
-import sys  
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../../", "src")))  
 
 from ega.algorithms.brute_force import BruteForce
 from ega.util.gaussian_kernel import GaussianKernel
@@ -19,6 +16,8 @@ from memory_profiler import profile
 from line_profiler import LineProfiler 
 import networkx 
 
+from ega import default_curvox_dataset_path
+
 
 @profile
 def evaluate_brute_force_memory(adjacency_lists, kernel_function, graph_field):
@@ -29,11 +28,8 @@ def evaluate_brute_force_time(adjacency_lists, kernel_function, graph_field):
     brute_force = BruteForce(adjacency_lists, kernel_function)
     Mx = brute_force.model_top_field(graph_field)
 
-
-if __name__ == '__main__':
-
+def main():    
     # load sample mesh data 
-    default_curvox_dataset_path = os.path.abspath(os.path.join("../../", "data", "curvox_dataset"))
     mesh_file = os.path.join(default_curvox_dataset_path, "meshes/ycb/014_lemon", 'nontextured.stl')
     mesh = trimesh.load(mesh_file)
     graph = trimesh.graph.vertex_adjacency_graph(mesh)
@@ -53,7 +49,10 @@ if __name__ == '__main__':
     lp_wrapper = lp(evaluate_brute_force_time)
     lp_wrapper(adjacency_lists, kernel_function, graph_field)
     lp.print_stats()
-   
 
+
+if __name__ == '__main__':
+    main()
+   
 
 
