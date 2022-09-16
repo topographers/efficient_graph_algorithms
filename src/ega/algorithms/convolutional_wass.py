@@ -7,24 +7,24 @@ import torch.nn.functional as F
 small_constant = 1e-12
 
 
-def convolve_images(imgs, K1, K2=None):
+def convolve_images(imgs, kernel_x, kernel_y=None):
     """
     Simple convolution. First it blurs along x-axis and then y-axis
     """
-    if K2 is None:
-        K2 = K1
-    kx = torch.einsum("...ij,kjl->kil", K1, imgs)
-    kxy = torch.einsum("...ij,klj->kli", K2, kx)
+    if kernel_y is None:
+        kernel_y = kernel_x
+    kx = torch.einsum("...ij,kjl->kil", kernel_x, imgs)
+    kxy = torch.einsum("...ij,klj->kli", kernel_y, kx)
     return kxy
 
 
-def convolve_clouds(cloud, K):
+def convolve_clouds(cloud, kernel):
     """
     Convolution for 3d point clouds. First 1d convolution along x-axis, then y-axis and finally z-axis.
     """
-    kx = torch.einsum("ij,rjlk->rilk", K, cloud)
-    kxy = torch.einsum("ij,rkjl->rkil", K, kx)
-    kxyz = torch.einsum("ij,rlkj->rlki", K, kxy)
+    kx = torch.einsum("ij,rjlk->rilk", kernel, cloud)
+    kxy = torch.einsum("ij,rkjl->rkil", kernel, kx)
+    kxyz = torch.einsum("ij,rlkj->rlki", kernel, kxy)
     return kxyz
 
 
