@@ -2,6 +2,7 @@
 import trimesh 
 import numpy as np 
 import scipy
+from typing import List
 
 def random_circular_rotation(adjacency_lists, seed):
     np.random.seed(seed)
@@ -54,7 +55,7 @@ def trimesh_to_adjacency_matrices(mesh, seed=0):
     return random_circular_rotation(adjacency_lists, seed)
 
 
-def adjacency_list_to_sparse_matrix(adjacency_lists: list[list[int]]):
+def adjacency_list_to_sparse_matrix(adjacency_lists: List[List[int]]):
     row_idx_list = []
     rwo_content_list = []
     for i_idx, i_list in enumerate(adjacency_lists):
