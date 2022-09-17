@@ -3,11 +3,10 @@ import simple_3dviz.behaviours.io
 import simple_3dviz.behaviours.trajectory
 import simple_3dviz.behaviours.movements
 import numpy as np
+import numba
 from simple_3dviz import Spherecloud
 from simple_3dviz.behaviours import Behaviour
 
-from mvp.geometry.math import minmax
-from mvp.geometry.voxelgrid import VoxelGrid, VOXEL_RESOLUTION_CONSTANT
 
 scene_for_module = None
 DEFAULT_SIZE = 1000
@@ -25,6 +24,43 @@ _CITATION = """
 """
 
 
+@numba.njit(nopython=True)
+def minmax(array):
+    # Ravel the array and return early if it's empty
+    array = array.ravel()
+    length = array.size
+    if not length:
+        return
+    # We want to process two elements at once so we need
+    # an even sized array, but we preprocess the first and
+    # start with the second element, so we want it "odd"
+    odd = length % 2
+    if not odd:
+        length -= 1
+    # Initialize min and max with the first item
+    minimum = maximum = array[0]
+    i = 1
+    while i < length:
+        # Get the next two items and swap them if necessary
+        x = array[i]
+        y = array[i + 1]
+        if x > y:
+            x, y = y, x
+        # Compare the min with the smaller one and the max
+        # with the bigger one
+        minimum = min(x, minimum)
+        maximum = max(y, maximum)
+        i += 2
+    # If we had an even sized array we need to compare the
+    # one remaining item too.
+    if not odd:
+        x = array[length]
+        minimum = min(x, minimum)
+        maximum = max(x, maximum)
+
+        return minimum, maximum
+
+
 def initial_scene_for_module(size=(DEFAULT_SIZE, DEFAULT_SIZE)):
     global scene_for_module
     if scene_for_module is None:
@@ -39,6 +75,7 @@ class FrameBuffer(Behaviour):
         number_of_frames: Number of frames to save
         every_n: int, Save every n frames instead of all frames.
     """
+
     def __init__(self, number_of_frames, image_width, image_height, every_n=1):
         self.frame_buffer = np.zeros((number_of_frames, image_width, image_height, 3))
         self._every_n = every_n
@@ -48,12 +85,20 @@ class FrameBuffer(Behaviour):
         if (self._i % self._every_n) != 0:
             return
 
-        self.frame_buffer[self._i//self._every_n] = params.frame()[:, :, 0:3]
+        self.frame_buffer[self._i // self._every_n] = params.frame()[:, :, 0:3]
 
         self._i += 1
 
 
-def render_pointcloud_still_np(points, save_file_path=None, color=np.array([1, 0, 0]), size=(DEFAULT_SIZE, DEFAULT_SIZE), camera_position=(1.1, 1.1, 1.1), sphere_size=0.02, scale_points=True):
+def render_pointcloud_still_np(
+    points,
+    save_file_path=None,
+    color=np.array([1, 0, 0]),
+    size=(DEFAULT_SIZE, DEFAULT_SIZE),
+    camera_position=(1.1, 1.1, 1.1),
+    sphere_size=0.02,
+    scale_points=True,
+):
     global scene_for_module
     if scene_for_module is None:
         scene_for_module = simple_3dviz.scenes.Scene(size)
@@ -92,7 +137,7 @@ def render_pointcloud_still_np(points, save_file_path=None, color=np.array([1, 0
         light=(-2, -2, 2),
         n_frames=1,
         size=size,
-        scene=scene_for_module
+        scene=scene_for_module,
     )
 
     return frame_buffer.frame_buffer[0]
@@ -117,7 +162,9 @@ def render_mesh_still(
         behaviours.append(simple_3dviz.behaviours.io.SaveFrames(save_file_path))
 
     if camera_target is None:
-        camera_target = np.average([np.min(mesh.vertices, axis=0), np.max(mesh.vertices, axis=0)], axis=0)
+        camera_target = np.average(
+            [np.min(mesh.vertices, axis=0), np.max(mesh.vertices, axis=0)], axis=0
+        )
     mesh = simple_3dviz.Mesh.from_faces(mesh.vertices, mesh.faces, color)
     simple_3dviz.render(
         mesh,
@@ -127,7 +174,7 @@ def render_mesh_still(
         light=(-2, -2, 2),
         n_frames=1,
         size=size,
-        scene=scene_for_module
+        scene=scene_for_module,
     )
 
     return frame_buffer.frame_buffer[0]
@@ -141,7 +188,7 @@ def render_mesh_movie(
     camera_position=(0.35, 0.35, 0.35),
     camera_target=(0, 0, 0),
     number_of_images=64,
-    rotation_axis='z',
+    rotation_axis="z",
 ):
     global scene_for_module
     if scene_for_module is None:
@@ -153,15 +200,14 @@ def render_mesh_movie(
         mesh,
         behaviours=[
             simple_3dviz.behaviours.movements.RotateModel(
-                axis=rotation_axis,
-                speed=2 * np.pi/number_of_images
+                axis=rotation_axis, speed=2 * np.pi / number_of_images
             ),
-            simple_3dviz.behaviours.io.SaveGif(save_file_path, duration=100)
+            simple_3dviz.behaviours.io.SaveGif(save_file_path, duration=100),
         ],
         camera_position=camera_position,
         camera_target=camera_target,
         n_frames=number_of_images,
         light=(-2, -2, 2),
         size=size,
-        scene=scene_for_module
+        scene=scene_for_module,
     )
