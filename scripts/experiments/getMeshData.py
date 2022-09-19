@@ -60,25 +60,26 @@ def cotangent_laplacian(vertices: float, faces: int):
     locs = [i for i in range(len(cA[:,2])) if cA[i,2] < 0]
     At[locs,0] = Ar[locs]/8; At[locs,1] = Ar[locs]/8; At[locs,2] = Ar[locs]/4;
 
-    # Vertex areas = sum triangles nearby
+    '''
+
+    area weights are lumped areas proportional to the sum of triangle areas adjacent to a given vertex
+    area weights are rescaled to area = 1
+    
+    '''
     J = np.zeros(len(I)).astype(int);
     S = np.concatenate((At[:,0], At[:,1], At[:,2]));
     area_weights = sps.csr_matrix((S, (I,J)), shape=(num_vertices,1)) 
     cot_laplacian = sps.csr_matrix((Sn, (In,Jn)), shape=(num_vertices, num_vertices))
+    area_weights = area_weights / np.sum(area_weights)
     return cot_laplacian, area_weights
 
 def get_mesh_data(vertices: float, faces: int,num_eigs = 10):
     mesh_dictionary = {}
     mesh_dictionary['vertices'] = vertices
     mesh_dictionary['faces'] = faces
-    cot_laplacian, area_weights = cotangent_laplacian(vertices, faces)
-
-    # Change to negative cot Laplacian and rescale to area = 1
-    mesh_dictionary['area_weights'] = area_weights / np.sum(area_weights)
-    mesh_dictionary['cot_laplacian'] = -cot_laplacian
-
-    num_vertices = len(vertices)
-    mesh_dictionary['num_vertices'] = num_vertices
+    mesh_dictionary['cot_laplacian'], area_weights = cotangent_laplacian(vertices, faces)
+    mesh_dictionary['area_weights'] = np.array(area_weights.todense()).T[0]
+    mesh_dictionary['num_vertices'] = len(vertices)
     
     return mesh_dictionary
     

@@ -3,15 +3,30 @@ from scipy.optimize import root_scalar
 from typing import Callable
 
 def convolutional_barycenter(distributions_arr: float, alpha: float, area_weights: float,
-        kernel: Callable, kernel_transpose: Callable, options: dict, entropyLimit=None):
+        graph_field_integrator: Callable, options: dict, entropyLimit=None):
 
-    if kernel_transpose is None:
-        kernel_transpose = kernel
+    '''
 
-    area_weights_np = np.array(area_weights.todense()).T[0]
+    inputs:
+        graph_field_integrator is blackbox functions that take in a vector x, and return H_t * x, where H_t is the heat kernel.
+            since the heat kernel H_t is the same throughout the computations, we assume it is already computed
+            and stored in the blackbox function. i.e. the only input of the blackbox function is the vector x
+            The blackbox can be one of the following choices:
+            (1) explicit materialize the matrix H_t by doing explicit pairwise distance computation (Cuturi, 2013).
+            (2) use pre-factored Cholesky decomposition (Solomon et al, 2015)
+            (3) any efficient matrix-vector multiplication method
 
-    if area_weights_np is None:
-        area_weights_np = np.ones(np.size(distributions_arr,1),1)
+        distributions_arr is a 2d numpy array that contains distributions for which we wish to find the wasserstein_barycenter
+        alpha is a 1d array that contains a set of weights, the length is equal to the number of input distributions
+        area weights are lumped areas proportional to the sum of triangle areas adjacent to a given vertex
+
+    output:
+        wasserstein barycenter as a 1d array        
+
+    '''
+
+    if area_weights is None:
+        area_weights = np.ones(np.size(distributions_arr,1),1)
 
     niter = options['niter'] #1500
     tol = options['tol'] # 1e-7
@@ -38,19 +53,19 @@ def convolutional_barycenter(distributions_arr: float, alpha: float, area_weight
             reducing the number of unknowns
 
         """
-        w = np.divide(distributions_arr, kernel_transpose(np.multiply(v.T,area_weights_np).T))
+        w = np.divide(distributions_arr, graph_field_integrator(np.multiply(v.T,area_weights).T))
         
         if unit_area_projection == 1:
-            integrals = np.sum(np.multiply(area_weights_np,np.multiple(v, kernel(np.multiply(w.T,area_weights_np).T)),1))
+            integrals = np.sum(np.multiply(area_weights,np.multiply(v, graph_field_integrator(np.multiply(w.T,area_weights).T)),1))
             w = w/integrals
         
-        d = np.multiply(v, kernel(np.multiply(w.T,area_weights_np).T))
+        d = np.multiply(v, graph_field_integrator(np.multiply(w.T,area_weights).T))
 
         d[d<1e-300] = 1e-300
 
         barycenter = np.exp(np.sum(np.multiply(alpha,np.log(d)),axis=1))
 
-        entropy = -np.sum(np.multiply(area_weights_np, np.multiply(barycenter,np.log(barycenter))))
+        entropy = -np.sum(np.multiply(area_weights, np.multiply(barycenter,np.log(barycenter))))
 
         if j>1 and (entropyLimit is not None) and (entropy>entropyLimit):
             """
@@ -58,7 +73,7 @@ def convolutional_barycenter(distributions_arr: float, alpha: float, area_weight
             Entropic-Sharpening algorithm. Refer to Algorithm 3 in (Solomon et al, 2015)
             
             """
-            fn = lambda x: -np.sum(x*np.multiply(area_weights_np, np.multiply(np.power(barycenter, x), np.log(barycenter)))) - entropyLimit
+            fn = lambda x: -np.sum(x*np.multiply(area_weights, np.multiply(np.power(barycenter, x), np.log(barycenter)))) - entropyLimit
             try:
                 sol = root_scalar(fn, args=(), method='toms748', bracket=[0.5, 3])
                 beta = sol.root 
@@ -73,15 +88,15 @@ def convolutional_barycenter(distributions_arr: float, alpha: float, area_weight
         v = np.multiply(v.T,barycenter).T/d
         
         if unit_area_projection == 1:
-            integrals = np.sum(np.multiply(area_weights_np, np.multiply(v, kernel(np.multiply(w,area_weights))),1));
+            integrals = np.sum(np.multiply(area_weights, np.multiply(v, graph_field_integrator(np.multiply(w,area_weights))),1));
             v = np.divide(v,integrals)
         
 
-        change = np.sum(np.multiply(np.absolute(old_barycenter-barycenter), area_weights_np))
-        area = np.sum(np.multiply(barycenter, area_weights_np))
+        change = np.sum(np.multiply(np.absolute(old_barycenter-barycenter), area_weights))
+        area = np.sum(np.multiply(barycenter, area_weights))
         
         if verb==1:
             print('Iteration {0}:  change = {1}, area = {2}\n'.format(j,change,area))
         if j>1 and change < tol:
-            return barycenter, v
-    return barycenter, v
+            return barycenter
+    return barycenter
