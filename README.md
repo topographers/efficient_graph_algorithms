@@ -5,6 +5,8 @@ Implementations of efficient graph algorithms
 ```bash
 git clone git@github.com:Topographers/efficient_graph_algorithms.git
 cd efficient_graph_algorithms
+python3 -m venv env
+source env/bin/activate
 pip3 install -r requirements.txt
 pip3 install -e . --user
 ```

@@ -3,7 +3,7 @@ import numpy as np
 import random
 import os
 
-from ega.algorithms.brute_force import BruteForce
+from ega.algorithms.brute_force import BFGFIntegrator
 from ega.util.gaussian_kernel import GaussianKernel
 import ega.util.mesh_utils as mu
 from ega.evaluation.evaluator import Evaluator
@@ -20,13 +20,13 @@ from ega import default_curvox_dataset_path
 
 
 @profile
-def evaluate_brute_force_memory(adjacency_lists, kernel_function, graph_field):
-    brute_force = BruteForce(adjacency_lists, kernel_function)
-    Mx = brute_force.model_top_field(graph_field)
+def evaluate_brute_force_memory(adjacency_lists, weights_lists, vertices, f_fun, field):
+    brute_force = BFGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun)
+    Mx = brute_force.integrate_graph_field(field)
 
-def evaluate_brute_force_time(adjacency_lists, kernel_function, graph_field):
-    brute_force = BruteForce(adjacency_lists, kernel_function)
-    Mx = brute_force.model_top_field(graph_field)
+def evaluate_brute_force_time(adjacency_lists, weights_lists, vertices, f_fun, field):
+    brute_force = BFGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun)
+    Mx = brute_force.integrate_graph_field(field)
 
 def main():    
     # load sample mesh data 
@@ -36,19 +36,21 @@ def main():
     print(graph)
 
     # proprocess 
-    adjacency_lists = mu.trimesh_to_adjacency_matrices(mesh, seed=0)  
+    adjacency_lists = mu.trimesh_to_adjacency_matrices(mesh, seed=0)
     n_vertices = mesh.vertices.shape[0]
-    kernel_function = GaussianKernel(0.1)
-    graph_field = np.random.randn(n_vertices, 1)
-
-    # evaluate memory 
-    evaluate_brute_force_memory(adjacency_lists, kernel_function, graph_field)
+    f_fun = GaussianKernel(0.1)
+    field = np.random.randn(n_vertices, 1)
+    weights_lists = mu.generate_weights_from_adjacency_list(adjacency_lists) 
+    vertices = list(range(n_vertices))
 
     # evaluate time
     lp = LineProfiler()
     lp_wrapper = lp(evaluate_brute_force_time)
-    lp_wrapper(adjacency_lists, kernel_function, graph_field)
+    lp_wrapper(adjacency_lists, weights_lists, vertices, f_fun, field)
     lp.print_stats()
+
+    # evaluate memory 
+    evaluate_brute_force_memory(adjacency_lists, weights_lists, vertices, f_fun, field)
 
 
 if __name__ == '__main__':
