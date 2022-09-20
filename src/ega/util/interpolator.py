@@ -10,19 +10,28 @@ class Interpolator():
     def __init__(self, integrator: GFIntegrator, vertices_known: List[int], vertices_interpolate: List[int]):
         """ 
         integrator: the integrator to be used. For example: brute_force integrator 
-        vertices_known: the vertices known on the mesh graph, which are used to predict the fields of the vertices to be interpolated 
-        vertices_interpolate: the vertices with unknown fields to be interpolated 
+        vertices_known: a list of integers representing the vertices known on the mesh graph, 
+                        which are used to predict the fields of the vertices to be interpolated 
+        vertices_interpolate: a list of intergers representing the vertices with unknown fields to be interpolated 
         """
         self.integrator = integrator 
         self.vertices_known = vertices_known
         self.vertices_interpolate = vertices_interpolate
 
         # since we don't need to predict fields for known vertices, we mask these rows in _m_matrix as zeros 
+        # without this line of code, the method still works with the same result. 
+        # feel free to comment out this line if masking vertices_known in _m_matrtix is non-trivial in your integrator.
         self.integrator._m_matrix[vertices_known] = 0 
         
         
     def interpolate(self, field: np.ndarray) -> np.ndarray:
-        """ this function predicts the fields for the vertices to be interpolated from existing vertices on the mesh graph data """
+        """ 
+        this function predicts the fields for the vertices to be interpolated from existing vertices on the mesh graph data 
+        
+        inputs: field is an numpy ndarray (for example, a matrix with size N by d representing node features). 
+                It can also be a numpy nparray with more than dimension of 2 as long as we can use it as input to integrate_graph_field function 
+                    in the integrator.
+        """
         # since fields for vertices to be interpolated are unknown, we initialize them as zeros 
         field[self.vertices_interpolate] = 0 
         interpolated_fields = self.integrator.integrate_graph_field(field)[self.vertices_interpolate]
