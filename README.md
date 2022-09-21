@@ -24,4 +24,4 @@ For information on how to run each experiment:
 ## MeshGraphNet Datasets
 For information on how to download and prepare meshgraphnet dataset:
 
-* [docs/experiments/prepare_graph_mesh_data.md]
+* [docs/experiments/prepare_graph_mesh_data.md](docs/experiments/prepare_graph_mesh_data.md)
