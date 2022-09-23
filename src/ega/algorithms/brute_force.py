@@ -1,37 +1,30 @@
-from torch import nn
-from memory_profiler import profile
+import numpy as np 
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import floyd_warshall, shortest_path
 
+from ega.algorithms.gf_integrator import GFIntegrator
+from tqdm import tqdm 
 
-class BruteForce(nn.Module):
-    """
-    some definitions:
-        n: number of points in the graph
-        d: feature vector dimension for each point in the graph
+class BFGFIntegrator(GFIntegrator):
+    def __init__(self, adjacency_lists, weights_lists, vertices, f_fun):
+        super().__init__(adjacency_lists, weights_lists, vertices, f_fun)
+        self._m_matrix = self.get_kernel_graph()
 
-    inputs:
-        f: a function that applies to each entry of the distance matrix.
-        x: n by d feature matrix. Each row represents the feature vector of a point in the graph.
+    def get_kernel_graph(self):
+        n = len(self._adjacency_lists)
+        edges = np.zeros((n, n))
+        for i in range(n):
+            for j_idx, j in enumerate(self._adjacency_lists[i]):
+                w = self._weights_lists[i][j_idx]
+                edges[i,j] = w
+                edges[j,i] = w
+        csr_adjacency = csr_matrix(edges)
 
-    class description:
-        this BruteForce class takes function f and feature matrix x, and outputs: Mx,
-        where M[i,j] = f(dist(i,j))
-    """
-    def __init__(self, device, evaluator):
-        super(BruteForce, self).__init__()
-        self.device = device
-        self.evaluator = evaluator
+        #dist_G = floyd_warshall(csgraph=csr_adjacency, directed=False)
+        dist_G = shortest_path(csgraph=csr_adjacency, directed=False)
+        
+        return self._f_fun(dist_G)
 
-    @profile
-    def forward(self, f, M, x):
-
-        self.evaluator.start_time()
-
-        Mx =  f(M) @ x
-
-        self.evaluator.stop_time()
-        self.evaluator.record_memory_consumption(Mx)
-
-        return Mx
-
-
-
+    def integrate_graph_field(self, field):
+        return np.einsum('ij,j...->i...', self._m_matrix, field)
+    

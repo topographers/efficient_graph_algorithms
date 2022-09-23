@@ -1,4 +1,5 @@
-import torch
+#import torch
+import numpy as np
 
 
 class GaussianKernel(object):
@@ -12,4 +13,5 @@ class GaussianKernel(object):
         self.sigma = sigma
 
     def __call__(self, M):
-        return torch.exp(- self.sigma * M)
+        #return torch.exp(- self.sigma * M)
+        return np.exp(-self.sigma*M)

@@ -19,4 +19,9 @@ We have a strict coding guideline that is written [here](docs/coding_guidelines.
 For information on how to run each experiment:
 
 * [scripts/experiments/gaussian_kernel_test.py](docs/experiments/gaussian_kernel_test.md)
+* [scripts/experiments/interpolation_test.py](docs/experiments/interpolator_test.md)
 
+## MeshGraphNet Datasets
+For information on how to download and prepare meshgraphnet dataset:
+
+* [docs/experiments/prepare_graph_mesh_data.md](docs/experiments/prepare_graph_mesh_data.md)
