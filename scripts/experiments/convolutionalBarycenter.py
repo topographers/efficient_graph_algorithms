@@ -2,11 +2,16 @@ import numpy as np
 from scipy.optimize import root_scalar
 from typing import Callable
 
-def convolutional_barycenter(distributions_arr: float, alpha: float, area_weights: float,
-        graph_field_integrator: Callable, options: dict, entropyLimit=None):
+def convolutional_barycenter(
+    distributions_arr: float,
+    alpha: float,
+    area_weights: float,
+    graph_field_integrator: Callable,
+    options: dict,
+    entropyLimit=None
+):
 
     '''
-
     inputs:
         graph_field_integrator is blackbox functions that take in a vector x, and return H_t * x, where H_t is the heat kernel.
             since the heat kernel H_t is the same throughout the computations, we assume it is already computed
@@ -22,11 +27,10 @@ def convolutional_barycenter(distributions_arr: float, alpha: float, area_weight
 
     output:
         wasserstein barycenter as a 1d array        
-
     '''
 
     if area_weights is None:
-        area_weights = np.ones(np.size(distributions_arr,1),1)
+        area_weights = np.ones(np.size(distributions_arr, 1), 1)
 
     niter = options['niter'] #1500
     tol = options['tol'] # 1e-7
@@ -36,48 +40,40 @@ def convolutional_barycenter(distributions_arr: float, alpha: float, area_weight
     barycenter = options['initial_barycenter'] # np.ones(np.size(distributions_arr,1),1)
     unit_area_projection = options['unit_area_projection'] # 0
 
-    alpha = alpha/np.sum(alpha)
+    alpha = alpha / np.sum(alpha)
 
-    """
-
-    Wasserstein barycenter using iterated Bregman projection. Refer to Algorithm 2 in (Solomon et al, 2015)
-
-    """
-
+    # Wasserstein barycenter using iterated Bregman projection. Refer to Algorithm 2 in (Solomon et al, 2015)
     for j in range(niter):
         old_barycenter = barycenter
 
         """
-        
         vectors v, w, and d: instead of computing a transportation plan matrix, we can alternatively compute vectors v, w, and d
             reducing the number of unknowns
-
         """
-        w = np.divide(distributions_arr, graph_field_integrator(np.multiply(v.T,area_weights).T))
+        w = np.divide(distributions_arr, graph_field_integrator(np.multiply(v.T, area_weights).T))
         
         if unit_area_projection == 1:
-            integrals = np.sum(np.multiply(area_weights,np.multiply(v, graph_field_integrator(np.multiply(w.T,area_weights).T)),1))
-            w = w/integrals
+            matrix_vector_product = graph_field_integrator(np.multiply(w.T, area_weights).T)
+            integrals = np.sum(np.multiply(area_weights, np.multiply(v, matrix_vector_product), 1))
+            w = w / integrals
         
-        d = np.multiply(v, graph_field_integrator(np.multiply(w.T,area_weights).T))
+        d = np.multiply(v, graph_field_integrator(np.multiply(w.T, area_weights).T))
 
-        d[d<1e-300] = 1e-300
+        d[d < 1e-300] = 1e-300
 
-        barycenter = np.exp(np.sum(np.multiply(alpha,np.log(d)),axis=1))
+        barycenter = np.exp(np.sum(np.multiply(alpha, np.log(d)), axis=1))
 
-        entropy = -np.sum(np.multiply(area_weights, np.multiply(barycenter,np.log(barycenter))))
+        entropy = -np.sum(np.multiply(area_weights, np.multiply(barycenter, np.log(barycenter))))
 
-        if j>1 and (entropyLimit is not None) and (entropy>entropyLimit):
-            """
-
-            Entropic-Sharpening algorithm. Refer to Algorithm 3 in (Solomon et al, 2015)
+        if j > 1 and (entropyLimit is not None) and (entropy > entropyLimit):
             
-            """
-            fn = lambda x: -np.sum(x*np.multiply(area_weights, np.multiply(np.power(barycenter, x), np.log(barycenter)))) - entropyLimit
+            # Entropic-Sharpening algorithm. Refer to Algorithm 3 in (Solomon et al, 2015)
+            fn = lambda x: -np.sum(x * np.multiply(area_weights,
+                           np.multiply(np.power(barycenter, x), np.log(barycenter)))) - entropyLimit
             try:
                 sol = root_scalar(fn, args=(), method='toms748', bracket=[0.5, 3])
                 beta = sol.root 
-                if verb==1:
+                if verb == 1:
                     print('\ta = %g\n', beta)
             except:
                 beta = 1
@@ -85,18 +81,19 @@ def convolutional_barycenter(distributions_arr: float, alpha: float, area_weight
             
             barycenter = np.power(barycenter, beta)
 
-        v = np.multiply(v.T,barycenter).T/d
+        v = np.multiply(v.T, barycenter).T / d
         
         if unit_area_projection == 1:
-            integrals = np.sum(np.multiply(area_weights, np.multiply(v, graph_field_integrator(np.multiply(w,area_weights))),1));
-            v = np.divide(v,integrals)
+            matrix_vector_product = graph_field_integrator(np.multiply(w, area_weights))
+            integrals = np.sum(np.multiply(area_weights, np.multiply(v, matrix_vector_product), 1));
+            v = np.divide(v, integrals)
         
 
-        change = np.sum(np.multiply(np.absolute(old_barycenter-barycenter), area_weights))
+        change = np.sum(np.multiply(np.absolute(old_barycenter - barycenter), area_weights))
         area = np.sum(np.multiply(barycenter, area_weights))
         
-        if verb==1:
-            print('Iteration {0}:  change = {1}, area = {2}\n'.format(j,change,area))
-        if j>1 and change < tol:
+        if verb == 1:
+            print('Iteration {0}:  change = {1}, area = {2}\n'.format(j, change, area))
+        if j > 1 and change < tol:
             return barycenter
     return barycenter
