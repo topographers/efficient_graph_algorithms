@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 from getMeshData import get_mesh_data
 from blurOnMesh import blur_on_mesh
-from convolutionalBarycenter import convolutional_barycenter
+from convolutionalBarycenter import ConvolutionalBarycenter
 import trimesh
 from ega.visualization.mesh_visualization import simple3d_save_gif
 import os
@@ -67,22 +67,10 @@ def main():
         distributions[:,i] =  blur_on_mesh(
             distributions[:,i], mesh_dictionary, blur_time, blur_steps)
 
-    options={}
-    options['niter'] = args.niter 
-    options['tol'] = args.tol 
-    options['verb'] = args.verb 
-    options['disp'] = []
-    options['initial_v'] = np.ones(distributions.shape)
-    options['initial_barycenter'] = np.ones((distributions.shape[0], 1))
-    options['unit_area_projection'] = 0
-    options['Display'] = None
-    options['tolfun'] = 1e-4
-    options['tolx'] = 1e-4
-
-
     alpha = np.ones(3)
-    barycenter = convolutional_barycenter(distributions, alpha, mesh_dictionary['area_weights'],
-                                          graph_field_integrator_solomon_2015, options)
+    conv_barycenter = ConvolutionalBarycenter()
+    barycenter = conv_barycenter.get_convolutional_barycenter(distributions, alpha,
+                     graph_field_integrator_solomon_2015, mesh_dictionary['area_weights'])
     print(barycenter)
 
     # plot wasserstein barycentern and different input distributions

@@ -3,7 +3,7 @@ import numpy as np
 from getMeshData import get_mesh_data
 from blurOnMesh import blur_on_mesh
 import trimesh
-from convolutionalDistance import convolutional_distance
+from convolutionalDistance import ConvolutionalDistance
 from ega.visualization.mesh_visualization import simple3d_save_gif
 import os
 
@@ -58,19 +58,15 @@ def main():
     blur_steps = 3
     graph_field_integrator_solomon_2015 = lambda x: blur_on_mesh(x, mesh_dictionary, blur_time, blur_steps)
 
-    options={}
-    options['niter'] = args.niter 
-    options['tol'] = args.tol 
-    options['verb'] = args.verb 
-
     # compute distances from delta function at a single source to all targets
     sourceVtx = 0 
-    source = np.zeros((mesh_dictionary['num_vertices'],mesh_dictionary['num_vertices']))
+    source = np.zeros((mesh_dictionary['num_vertices'], mesh_dictionary['num_vertices']))
     source[sourceVtx,:] = 1 / mesh_dictionary['area_weights'][sourceVtx]
     target = np.diag(1 / mesh_dictionary['area_weights'])
 
-    wass_dist = convolutional_distance(source,target, mesh_dictionary['area_weights'],
-                                       graph_field_integrator_solomon_2015, options)
+    conv_distance = ConvolutionalDistance()
+    wass_dist = conv_distance.get_convolutional_distance(source, target,
+                    mesh_dictionary['area_weights'], graph_field_integrator_solomon_2015)
 
     print(wass_dist)
 
