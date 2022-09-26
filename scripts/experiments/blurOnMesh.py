@@ -15,6 +15,7 @@ def blur_on_mesh(signal: float, mesh_dictionary: dict, time: float, steps: int):
         a 1d vector, the result of the matrix vector multplication  
     '''
     area_weights = mesh_dictionary['area_weights']
+    assert steps > 0
     matrix_to_pre_factor = np.diag(area_weights) + time / steps * mesh_dictionary['cot_laplacian']
     # use cholesky factorization to efficiently solve systems of linear equations
     L = np.linalg.cholesky(matrix_to_pre_factor)

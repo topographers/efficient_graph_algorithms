@@ -31,8 +31,8 @@ def download_mesh_files(file_list, destination_directory):
         current_file_path = os.path.join(current_directory, file_name)
         output_file_path = os.path.join(destination_directory, file_name)
         shutil.move(current_file_path, output_file_path)
-        
-if __name__ == '__main__':
+
+def main():
     parser = argparse.ArgumentParser('TopoGrapher', parents=[get_args_parser()])
     args = parser.parse_args()
     destination_directory = args.output_folder
@@ -40,6 +40,9 @@ if __name__ == '__main__':
     file_list = [['hand1', '1fdYX1CFYg9qdRAYV7pttRlEv74QyRqhZ'],
                  ['moomoo_s0', '1z4whYv39rHoSk9BoTUAHRsM2Mci-LW-i']]
     download_mesh_files(file_list, destination_directory)
+    
+if __name__ == '__main__':
+    main()
 
 
 

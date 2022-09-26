@@ -20,7 +20,6 @@ class ConvolutionalBarycenter():
         initial_v: float=None,
         initial_barycenter: float=None
     ):
-
         '''
         inputs:
             graph_field_integrator is blackbox functions that take in a vector x, and return H_t * x, where H_t is the heat kernel.
@@ -69,7 +68,6 @@ class ConvolutionalBarycenter():
             entropy = -np.sum(np.multiply(area_weights, np.multiply(barycenter, np.log(barycenter))))
 
             if j > 1 and (entropyLimit is not None) and (entropy > entropyLimit):
-                
                 # Entropic-Sharpening algorithm. Refer to Algorithm 3 in (Solomon et al, 2015)
                 fn = lambda x: -np.sum(x * np.multiply(area_weights,
                                np.multiply(np.power(barycenter, x), np.log(barycenter)))) - entropyLimit
@@ -88,9 +86,8 @@ class ConvolutionalBarycenter():
             
             if self.unit_area_projection == 1:
                 matrix_vector_product = graph_field_integrator(np.multiply(w, area_weights))
-                integrals = np.sum(np.multiply(area_weights, np.multiply(v, matrix_vector_product), 1));
+                integrals = np.sum(np.multiply(area_weights, np.multiply(v, matrix_vector_product), 1))
                 v = np.divide(v, integrals)
-            
 
             change = np.sum(np.multiply(np.absolute(old_barycenter - barycenter), area_weights))
             area = np.sum(np.multiply(barycenter, area_weights))
