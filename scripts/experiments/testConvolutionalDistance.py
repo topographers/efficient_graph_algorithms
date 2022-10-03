@@ -67,7 +67,7 @@ def main():
     conv_distance = ConvolutionalDistance()
     wass_dist = conv_distance.get_convolutional_distance(source, target,
                     mesh_dictionary['area_weights'], graph_field_integrator_solomon_2015)
-
+    print('Wasserstein Distance: ')
     print(wass_dist)
 
     output_file_path = args.output_folder + "/wasserstein_distance" + ".gif"

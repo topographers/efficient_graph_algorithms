@@ -71,6 +71,7 @@ def main():
     conv_barycenter = ConvolutionalBarycenter()
     barycenter = conv_barycenter.get_convolutional_barycenter(distributions, alpha,
                      graph_field_integrator_solomon_2015, mesh_dictionary['area_weights'])
+    print('Wasserstein Barycenter: ')
     print(barycenter)
 
     # plot wasserstein barycentern and different input distributions
