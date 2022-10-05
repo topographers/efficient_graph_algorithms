@@ -3,6 +3,7 @@ import trimesh
 import numpy as np 
 import scipy
 from typing import List
+import networkx as nx 
 
 def random_circular_rotation(adjacency_lists: List[List[int]], seed: int) -> List[List[int]]:
     """ this function randomly shuffles the adjacency list """
@@ -92,3 +93,17 @@ def generate_weights_from_adjacency_list(adjacency_lists: List[List[int]]) -> Li
         weight_lists.append(current_list)
 
     return weight_lists
+
+
+def calculate_interpolation_metrics(true_fields: np.ndarray, interpolated_fields: np.ndarray):
+    """ 
+    this function calculates the frobenius norma and cosine similarity between predicted and true graph fields. 
+    
+    true_fields and interpolated_fields: both should have dimension of N by d, with N represents number of nodes, 
+                                         and d represents the dimension of graph field features.
+    """
+    
+    frobenius_norm = np.linalg.norm(true_fields - interpolated_fields, ord = 'fro')
+    cosine_similarity = np.mean((true_fields*interpolated_fields).sum(axis = -1) / \
+        np.linalg.norm(true_fields, axis = -1) / np.linalg.norm(interpolated_fields, axis = -1))
+    print("Frobenious Norm: {}\nCosine Similarity: {}".format(frobenius_norm, cosine_similarity))

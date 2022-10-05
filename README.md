@@ -9,6 +9,7 @@ python3 -m venv env
 source env/bin/activate
 pip3 install -r requirements.txt
 pip3 install -e . --user
+git clone https://github.com/topographers/planar_separators.git
 ```
 
 ## Coding Guidelines
@@ -20,6 +21,8 @@ For information on how to run each experiment:
 
 * [scripts/experiments/gaussian_kernel_test.py](docs/experiments/gaussian_kernel_test.md)
 * [scripts/experiments/interpolation_test.py](docs/experiments/interpolator_test.md)
+* [scripts/experiments/meshgraphdata_interpolator_3dplot.py](docs/experiments/meshgraphdata_interpolator_3dplot.md)
+* [scripts/experiments/placebo_separator_test.py](docs/experiments/placebo_separator_test.md)
 
 ## MeshGraphNet Datasets
 For information on how to download and prepare meshgraphnet dataset:
