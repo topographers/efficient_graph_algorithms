@@ -17,7 +17,9 @@ def random_circular_rotation(adjacency_lists: List[List[int]], seed: int) -> Lis
 
 
 def neighbors_in_cyclic_order(face: List[int], vertex_index: int) -> List[int]:
-    """ this function returns neighbors of current vertex in cyclic order """
+    """ this function returns neighbors of current vertex in cyclic order. 
+        Kipton-Tarjan algorithm only works when the neighbor node indices are ordered either clockwise or anti-clockwise
+    """
     v1, v2, v3 = face
     if v1 == vertex_index:
         return [v2, v3]
