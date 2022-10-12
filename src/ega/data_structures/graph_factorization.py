@@ -4,12 +4,12 @@ class Slicer(object):
     """
     _clustering - a list of the form  [cl_1,....,cl_{h_1}] , where an element  cl_i  corresponds to these vertices for which 
                   the slicer was constructed that correspond to cluster of id i; 
-                  the element cl_i is a 2d-array (with rows corresponding to slices) of the form:  
+                  the element cl_i is itself a list of lists (with rows corresponding to slices) of the form:
                       cl_i = [l_0, l_1, ...], where l_i is the 1d-array of ids of vertices within distance i  
                       (measured in pre-defined units) from the sub-sampled separator corresponding to the slicer.
     """
     def __init__(self):
-        self._clustering = None           # If not None, a list of 2d-arrays
+        self._clustering = None           # If not None, a list of lists of lists 
 
 
 class NodeContent(object):
