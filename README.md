@@ -23,7 +23,8 @@ For information on how to run each experiment:
 * [scripts/experiments/interpolation_test.py](docs/experiments/interpolator_test.md)
 * [scripts/experiments/meshgraphdata_interpolator_3dplot.py](docs/experiments/meshgraphdata_interpolator_3dplot.md)
 * [scripts/experiments/placebo_separator_test.py](docs/experiments/placebo_separator_test.md)
-
+* [scripts/experiments/separator_test.py](docs/experiments/separator_test.md)
+* 
 ## MeshGraphNet Datasets
 For information on how to download and prepare meshgraphnet dataset:
 
