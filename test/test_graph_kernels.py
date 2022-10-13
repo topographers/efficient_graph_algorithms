@@ -2,6 +2,7 @@ import networkx as nx
 from ega.algorithms.graph_kernels import *
 import time
 
+# TODO: TEST SPEED AND ACCURACY WITH https://github.com/BorgwardtLab/GraphKernels
 # create a networkx graph
 g = nx.erdos_renyi_graph(500, 0.2, seed=42, directed=False)
 gk = GraphKernel(g, verbose_level=1)  # instantiates the kernel class
