@@ -15,26 +15,39 @@ class StopError(Exception):
 
 class NonConvergenceError(Exception):
     pass
- 
-def solve_1d_linesearch_quad_funct(a,b,c):
-    # solve min f(x)=a*x**2+b*x+c sur 0,1
-    f0=c
-    df0=b
-    f1=a+f0+df0
 
-    if a>0: # convex
-        minimum=min(1,max(0,-b/(2*a)))
-        #print('entrelesdeux')
+
+def solve_1d_linesearch_quad_funct(a, b, c):
+    # solve min f(x)=a*x**2+b*x+c sur 0,1
+    f0 = c
+    df0 = b
+    f1 = a + f0 + df0
+
+    if a > 0:  # convex
+        minimum = min(1, max(0, -b / (2 * a)))
+        # print('entrelesdeux')
         return minimum
-    else: # non convexe donc sur les coins
-        if f0>f1:
-            #print('sur1 f(1)={}'.format(f(1)))            
+    else:  # non convexe donc sur les coins
+        if f0 > f1:
+            # print('sur1 f(1)={}'.format(f(1)))
             return 1
         else:
-            #print('sur0 f(0)={}'.format(f(0)))
+            # print('sur0 f(0)={}'.format(f(0)))
             return 0
 
-def line_search_armijo(f, xk, pk, gfk, old_fval, args=(), c1=1e-4, alpha0=0.99, alpha_min=None, alpha_max=None):
+
+def line_search_armijo(
+    f,
+    xk,
+    pk,
+    gfk,
+    old_fval,
+    args=(),
+    c1=1e-4,
+    alpha0=0.99,
+    alpha_min=None,
+    alpha_max=None,
+):
     """
     Armijo linesearch function that works with matrices
     find an approximate minimum of f(xk+alpha*pk) that satifies the
@@ -78,24 +91,38 @@ def line_search_armijo(f, xk, pk, gfk, old_fval, args=(), c1=1e-4, alpha0=0.99, 
         return f(xk + alpha1 * pk, *args)
 
     if old_fval is None:
-        phi0 = phi(0.)
+        phi0 = phi(0.0)
     else:
         phi0 = old_fval
 
     derphi0 = np.sum(pk * gfk)  # Quickfix for matrices
-    alpha, phi1 = scalar_search_armijo(
-        phi, phi0, derphi0, c1=c1, alpha0=alpha0)
+    alpha, phi1 = scalar_search_armijo(phi, phi0, derphi0, c1=c1, alpha0=alpha0)
 
     if alpha is None:
-        return 0., fc[0], phi0
+        return 0.0, fc[0], phi0
     else:
         if alpha_min is not None or alpha_max is not None:
             alpha = np.clip(alpha, alpha_min, alpha_max)
         return float(alpha), fc[0], phi1
 
 
-def do_linesearch(cost,G,deltaG,Mi,f_val,amijo=True,C1=None,C2=None,reg=None,Gc=None,constC=None,M=None, alpha_min=None, alpha_max=None):
-  
+def do_linesearch(
+    cost,
+    G,
+    deltaG,
+    Mi,
+    f_val,
+    amijo=True,
+    C1=None,
+    C2=None,
+    reg=None,
+    Gc=None,
+    constC=None,
+    M=None,
+    alpha_min=None,
+    alpha_max=None,
+):
+
     """
     Solve the linesearch in the FW iterations
     Parameters
@@ -140,22 +167,47 @@ def do_linesearch(cost,G,deltaG,Mi,f_val,amijo=True,C1=None,C2=None,reg=None,Gc=
         International Conference on Machine Learning (ICML). 2019.
     """
     if amijo:
-        alpha, fc, f_val = line_search_armijo(cost, G, deltaG, Mi, f_val, alpha_min=alpha_min, alpha_max=alpha_max)
-    else: #need sym matrices
-        dot = np.dot(np.dot(C1,deltaG), C2)
-        a=-2*reg*np.sum(dot*deltaG) #-2*alpha*<C1 dt C2,dt> si qqlun est pas bon c'est lui
-        b=np.sum((M+reg*constC)*deltaG)-2*reg*(np.sum(dot*G)+np.sum(np.dot(np.dot(C1,G),C2)*deltaG)) 
-        c=cost(G) #f(xt)
+        alpha, fc, f_val = line_search_armijo(
+            cost, G, deltaG, Mi, f_val, alpha_min=alpha_min, alpha_max=alpha_max
+        )
+    else:  # need sym matrices
+        dot = np.dot(np.dot(C1, deltaG), C2)
+        a = (
+            -2 * reg * np.sum(dot * deltaG)
+        )  # -2*alpha*<C1 dt C2,dt> si qqlun est pas bon c'est lui
+        b = np.sum((M + reg * constC) * deltaG) - 2 * reg * (
+            np.sum(dot * G) + np.sum(np.dot(np.dot(C1, G), C2) * deltaG)
+        )
+        c = cost(G)  # f(xt)
 
-        alpha=solve_1d_linesearch_quad_funct(a,b,c)
+        alpha = solve_1d_linesearch_quad_funct(a, b, c)
         if alpha_min is not None or alpha_max is not None:
             alpha = np.clip(alpha, alpha_min, alpha_max)
-        fc=None
-        f_val=cost(G+alpha*deltaG)
-        
-    return alpha,fc,f_val
+        fc = None
+        f_val = cost(G + alpha * deltaG)
 
-def cg(a, b, M, reg, f, df, G0=None, numItermax=500, numItermaxEmd=100000, stopThr=1e-09, stopThr2=1e-9, verbose=False,log=False,amijo=True,C1=None,C2=None,constC=None):
+    return alpha, fc, f_val
+
+
+def cg(
+    a,
+    b,
+    M,
+    reg,
+    f,
+    df,
+    G0=None,
+    numItermax=500,
+    numItermaxEmd=100000,
+    stopThr=1e-09,
+    stopThr2=1e-9,
+    verbose=False,
+    log=False,
+    amijo=True,
+    C1=None,
+    C2=None,
+    constC=None,
+):
     """
     Solve the general regularized OT problem with conditional gradient
         The function solves the following optimization problem:
@@ -207,7 +259,7 @@ def cg(a, b, M, reg, f, df, G0=None, numItermax=500, numItermaxEmd=100000, stopT
     loop = 1
 
     if log:
-        log = {'loss': [],'delta_fval': []}
+        log = {"loss": [], "delta_fval": []}
 
     if G0 is None:
         G = np.outer(a, b)
@@ -217,46 +269,60 @@ def cg(a, b, M, reg, f, df, G0=None, numItermax=500, numItermaxEmd=100000, stopT
     def cost(G):
         return np.sum(M * G) + reg * f(G)
 
-    f_val = cost(G) #f(xt)
+    f_val = cost(G)  # f(xt)
 
     if log:
-        log['loss'].append(f_val)
+        log["loss"].append(f_val)
 
     it = 0
 
     if verbose:
-        print('{:5s}|{:12s}|{:8s}'.format(
-            'It.', 'Loss', 'Delta loss') + '\n' + '-' * 32)
-        print('{:5d}|{:8e}|{:8e}'.format(it, f_val, 0))
+        print(
+            "{:5s}|{:12s}|{:8s}".format("It.", "Loss", "Delta loss") + "\n" + "-" * 32
+        )
+        print("{:5d}|{:8e}|{:8e}".format(it, f_val, 0))
 
     while loop:
 
         it += 1
         old_fval = f_val
-        #G=xt
+        # G=xt
         # problem linearization
-        Mi = M + reg * df(G) #Gradient(xt)
+        Mi = M + reg * df(G)  # Gradient(xt)
         # set M positive
         Mi += Mi.min()
 
         # solve linear program
-        Gc, logemd = emd(a, b, Mi,numItermax=numItermaxEmd, log=True) #st
+        Gc, logemd = emd(a, b, Mi, numItermax=numItermaxEmd, log=True)  # st
 
-        deltaG = Gc - G #dt
+        deltaG = Gc - G  # dt
 
         # argmin_alpha f(xt+alpha dt)
-        alpha, fc, f_val = do_linesearch(cost=cost,G=G,deltaG=deltaG,Mi=Mi,f_val=f_val,amijo=amijo,constC=constC,C1=C1,C2=C2,reg=reg,Gc=Gc,M=M)
+        alpha, fc, f_val = do_linesearch(
+            cost=cost,
+            G=G,
+            deltaG=deltaG,
+            Mi=Mi,
+            f_val=f_val,
+            amijo=amijo,
+            constC=constC,
+            C1=C1,
+            C2=C2,
+            reg=reg,
+            Gc=Gc,
+            M=M,
+        )
 
-        if alpha is None or np.isnan(alpha) :
-            raise NonConvergenceError('Alpha is not found')
+        if alpha is None or np.isnan(alpha):
+            raise NonConvergenceError("Alpha is not found")
         else:
-            G = G + alpha * deltaG #xt+1=xt +alpha dt
+            G = G + alpha * deltaG  # xt+1=xt +alpha dt
 
         # test convergence
         if it >= numItermax:
             loop = 0
-            
-        delta_fval = (f_val - old_fval)
+
+        delta_fval = f_val - old_fval
         abs_delta_fval = abs(f_val - old_fval)
 
         relative_delta_fval = abs_delta_fval / abs(f_val)
@@ -264,14 +330,17 @@ def cg(a, b, M, reg, f, df, G0=None, numItermax=500, numItermaxEmd=100000, stopT
             loop = 0
 
         if log:
-            log['loss'].append(f_val)
-            log['delta_fval'].append(delta_fval)
+            log["loss"].append(f_val)
+            log["delta_fval"].append(delta_fval)
 
         if verbose:
             if it % 20 == 0:
-                print('{:5s}|{:12s}|{:8s}'.format(
-                    'It.', 'Loss', 'Delta loss') + '\n' + '-' * 32)
-            print('{:5d}|{:8e}|{:8e}|{:5e}'.format(it, f_val, delta_fval,alpha))
+                print(
+                    "{:5s}|{:12s}|{:8s}".format("It.", "Loss", "Delta loss")
+                    + "\n"
+                    + "-" * 32
+                )
+            print("{:5d}|{:8e}|{:8e}|{:5e}".format(it, f_val, delta_fval, alpha))
 
     if log:
         log.update(logemd)
