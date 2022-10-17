@@ -1,11 +1,11 @@
 import argparse
 import numpy as np
-from getMeshData import get_mesh_data
-from blurOnMesh import blur_on_mesh
 import trimesh
-from convolutionalDistance import ConvolutionalDistance
-from ega.visualization.mesh_visualization import simple3d_save_gif
 import os
+from ega.util.get_mesh_data import get_mesh_data
+from ega.util.blur_on_mesh import blur_on_mesh
+from ega.algorithms.convolutional_distance import ConvolutionalDistance
+from ega.visualization.mesh_visualization import simple3d_save_gif
 
 def get_args_parser():
     parser = argparse.ArgumentParser('convbarycenter', add_help=False)
