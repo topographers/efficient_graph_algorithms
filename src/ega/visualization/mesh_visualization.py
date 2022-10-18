@@ -44,8 +44,13 @@ def simple3d_save_gif(distribution: float, mesh: dict, output_file_path: str):
     )
 
 
-def plot_mesh(world_pos: np.ndarray, vertices_interpolate_pos: np.ndarray, true_fields: np.ndarray, interpolated_fields: np.ndarray, 
-              snapshot_index: int, scale: int = 15):
+def plot_mesh(world_pos: np.ndarray, 
+              vertices_interpolate_pos: np.ndarray, 
+              true_fields: np.ndarray, 
+              interpolated_fields: np.ndarray, 
+              snapshot_index: int, 
+              scale: int = 15, 
+              saveimg: bool = False):
     """
     this function uses plotly for meshgraphnet data visualization.
     predicted and true fields(velocities) of vertices to be interpolated are shown as arrows on the 3d plot 
@@ -82,7 +87,8 @@ def plot_mesh(world_pos: np.ndarray, vertices_interpolate_pos: np.ndarray, true_
     fig = go.Figure(data=[points, mesh, true_velocities, interpolated_velocities, ],)
 
     fig.show()
-    #fig.write_image(
-    #    os.path.join(default_meshgraphnet_dataset_path,'flag_simple','flag_{}.png'.format(snapshot_index)))
+    if saveimg:
+        fig.write_image(
+            os.path.join(default_meshgraphnet_dataset_path,'flag_simple','flag_{}.png'.format(snapshot_index)))
     plot(fig,filename="vector.html",auto_open=True,image='png',image_height=1000,image_width=1100)
 
