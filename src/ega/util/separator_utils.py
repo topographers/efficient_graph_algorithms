@@ -30,27 +30,6 @@ def base_compute_clustering(adjacency_lists: List[List[int]], weights_lists: Lis
                             aset_indices: List[int], bset_indices: List[int], sources: List[int], unit_size: float):
     """ 
     a base function for clustering 
-    
-    G = nx.Graph()
-    for i in range(len(adjacency_lists)):
-        G.add_node(i)
-    for i in range(len(weights_lists)):
-        for j in range(len(weights_lists[i])):
-            G.add_edge(i, adjacency_lists[i][j], weight=weights_lists[i][j])
-    dist_dict, _ = nx.multi_source_dijkstra(G, sources)
-    dist_indices = [(math.floor(e[1] / unit_size), e[0]) for e in list(dist_dict.items())]
-    aset = set(aset_indices)
-    bset = set(bset_indices)
-    a_max_value = max([e[0] for e in dist_indices if e[1] in aset])
-    b_max_value = max([e[0] for e in dist_indices if e[1] in bset])
-    a_clustering = [[] for _ in range(a_max_value + 1)]
-    b_clustering = [[] for _ in range(b_max_value + 1)]
-    for e in dist_indices:
-        if e[1] in aset:
-            a_clustering[e[0]].append(e[1])
-        else:  
-            b_clustering[e[0]].append(e[1])
-    return a_clustering, b_clustering, [[0]]
     """
     
     G = nx.Graph()
