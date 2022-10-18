@@ -1,13 +1,10 @@
 import numpy as np 
 import time 
-
 from ega.algorithms.brute_force import BFGFIntegrator
 from ega.algorithms.separation_gf_integrator import PlaceboSeparationGFIntegrator
 
 
-
 def main():    
-    
     """
     the following example is from GraphFieldIntegrator.ipynb
     """
@@ -47,5 +44,3 @@ def main():
 if __name__ == '__main__':
     main()
    
-
-
