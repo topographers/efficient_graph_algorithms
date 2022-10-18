@@ -2,10 +2,8 @@ import numpy as np
 import math 
 from typing import List
 import networkx as nx 
-
 from ega.algorithms.brute_force import BFGFIntegrator
 from ega.data_structures.graph_factorization import GraphFactorization, NodeContent, Slicer 
-
 
 
 def find_indices(list_to_check: List[int], item_to_find: int) -> List[int]:
@@ -31,7 +29,6 @@ def base_compute_clustering(adjacency_lists: List[List[int]], weights_lists: Lis
     """ 
     a base function for clustering 
     """
-    
     G = nx.Graph()
     for i in range(len(adjacency_lists)):
         G.add_node(i)
@@ -67,7 +64,6 @@ def construct_placebo_graph_factorization(nb_vertices: int, threshold_nb_vertice
         the upper bound on the number of clusters in each node of the tree encoding graph factorization.
     """
     return recursively_contruct_placebo_graph_factorization(nb_vertices, threshold_nb_vertices, nb_clusters)
-
 
 
 def recursively_contruct_placebo_graph_factorization(nb_vertices: int, threshold_nb_vertices: int, nb_clusters: int) -> GraphFactorization:
@@ -108,8 +104,6 @@ def recursively_contruct_placebo_graph_factorization(nb_vertices: int, threshold
     return gf
 
 
-
-
 def construct_graph_factorization(adjacency_lists: List[List[int]], weights_lists: List[List[int]], separation_finder, compute_clustering, 
                                   unit_size: float, threshold_nb_vertices: int, vertices: List[int], f_fun):
     """
@@ -131,7 +125,6 @@ def construct_graph_factorization(adjacency_lists: List[List[int]], weights_list
                                                      unit_size, threshold_nb_vertices, vertices, f_fun)
 
 
-  
 def recursively_construct_graph_factorization(adjacency_lists: List[List[int]], weights_lists: List[List[int]], separation_finder, 
                                               compute_clustering, unit_size: float, threshold_nb_vertices: int, vertices: List[int], f_fun):
     """
@@ -190,13 +183,7 @@ def recursively_construct_graph_factorization(adjacency_lists: List[List[int]], 
         gf._right_child = recursively_construct_graph_factorization(b_adjacency_lists, b_weights_lists, separation_finder, 
                                                                     compute_clustering, unit_size, threshold_nb_vertices, 
                                                                     vertices[bset_indices], f_fun)
- 
     return gf
-
-
-
-
-
 
 
 def fast_multiply(hankel_row_column: np.ndarray, input_tensor: np.ndarray, multiplicative_shift=False) -> np.ndarray:
@@ -224,8 +211,6 @@ def fast_multiply(hankel_row_column: np.ndarray, input_tensor: np.ndarray, multi
                                    np.arange(len(hankel_row_column) - len(x) + 1))
             return first_entry * multipliers
         return np.apply_along_axis(func1d, 0, input_tensor)
-
-
 
 
 def integrate_factorized_graph_field(field: np.ndarray, graph_factorization: GraphFactorization, f_fun, 
@@ -285,5 +270,4 @@ def recursively_integrate_factorized_graph_field(field: np.ndarray, gf: GraphFac
 
     recursively_integrate_factorized_graph_field(field, gf._left_child, f_fun, unit_size, laplace, result)
     recursively_integrate_factorized_graph_field(field, gf._right_child, f_fun, unit_size, laplace, result)
-  
   
