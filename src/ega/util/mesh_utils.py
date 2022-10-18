@@ -80,8 +80,6 @@ def adjacency_list_to_sparse_matrix(adjacency_lists: List[List[int]]):
     return sparse_adjacency_matrix  
 
 
-
-
 def generate_weights_from_adjacency_list(adjacency_lists: List[List[int]]) -> List[List[int]]:
     """
     given an adjacency list, this function will return the corresponding unweighted list 
