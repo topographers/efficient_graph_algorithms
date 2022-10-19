@@ -20,7 +20,6 @@ We have a strict coding guideline that is written [here](docs/coding_guidelines.
 For information on how to run each experiment:
 
 * [scripts/experiments/gaussian_kernel_test.py](docs/experiments/gaussian_kernel_test.md)
-* [scripts/experiments/interpolation_test.py](docs/experiments/interpolator_test.md)
 * [scripts/experiments/meshgraphdata_interpolator_3dplot.py](docs/experiments/meshgraphdata_interpolator_3dplot.md)
 * [scripts/experiments/placebo_separator_test.py](docs/experiments/placebo_separator_test.md)
 * [scripts/experiments/separator_test.py](docs/experiments/separator_test.md)
