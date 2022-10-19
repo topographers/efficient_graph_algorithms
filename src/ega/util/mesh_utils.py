@@ -2,7 +2,8 @@
 import trimesh 
 import numpy as np 
 import scipy
-from typing import List
+from scipy import linalg
+from typing import List, Callable
 import networkx as nx 
 
 def random_circular_rotation(adjacency_lists: List[List[int]], seed: int) -> List[List[int]]:
@@ -30,7 +31,7 @@ def neighbors_in_cyclic_order(face: List[int], vertex_index: int) -> List[int]:
 
 def trimesh_to_adjacency_matrices(mesh: trimesh.base, seed = 0) -> List[List[int]]:
     """
-    given a trimesh object, this function will output the adjacency matrix
+    given a trimesh object, this function will output the adjacency lists
     """
     graph = trimesh.graph.vertex_adjacency_graph(mesh)
     vertices = list(graph.nodes)
@@ -107,3 +108,98 @@ def calculate_interpolation_metrics(true_fields: np.ndarray, interpolated_fields
     cosine_similarity = np.mean((true_fields*interpolated_fields).sum(axis = -1) / \
         np.linalg.norm(true_fields, axis = -1) / np.linalg.norm(interpolated_fields, axis = -1))
     print("Frobenious Norm: {}\nCosine Similarity: {}".format(frobenius_norm, cosine_similarity))
+
+
+def density_function(input_projection: np.ndarray) -> np.ndarray:
+    """
+    density function of the probabilistic distribution applied by the below 
+    random_projection_creator to construct projections
+    
+    both the input and output are 1d numpy arrays
+    """
+    dim = len(input_projection)
+    length = linalg.norm(input_projection)
+    return (1.0 / np.power(2.0 * np.pi, dim / 2.0)) * np.exp(-length**2 / 2.0)
+
+
+def random_projection_creator(num_random_features: int, 
+                              dim: int, 
+                              scaling=0, 
+                              ortho=True) -> np.ndarray:
+    """
+    this is a function  N * N -> R ^ {N * N}  that constructs random projections 
+    used to construct low-rank decomposition of the adjacency matrix.
+    
+    for the input: (num_rand_features, dim), a matrix of num_rand_features rows and 
+    dim columns is created (with different rows corresponding to different projections)
+    
+    ortho: 
+        if True, then we use blocks of orthogonal random features as projection directions
+        if False, then we use vanilla iid normals as projection directions
+    """
+    seed = 0
+    np.random.seed(seed)
+    if not ortho:
+        final_matrix = np.random.normal(size=(num_random_features, dim))
+    else:
+        nb_full_blocks = int(num_random_features / dim)
+        block_list = []
+        for _ in range(nb_full_blocks):
+            unstructured_block = np.random.normal(size=(dim, dim))
+            q, _ = np.linalg.qr(unstructured_block)
+            q = np.transpose(q)
+            block_list.append(q)
+        remaining_rows = num_random_features - nb_full_blocks * dim
+        if remaining_rows > 0:
+            unstructured_block = np.random.normal(size=(dim, dim))
+            q, _ = np.linalg.qr(unstructured_block)
+            q = np.transpose(q)
+            block_list.append(q[0:remaining_rows])
+        final_matrix = np.vstack(block_list)
+
+    if scaling == 0:
+        multiplier = np.linalg.norm(np.random.normal(size=(num_random_features, dim)), axis=1)
+    elif scaling == 1:
+        multiplier = np.sqrt(float(dim)) * np.ones((num_random_features))
+    else:
+        raise ValueError('Scaling must be one of {0, 1}. Was %s' % scaling)
+
+    return np.matmul(np.diag(multiplier), final_matrix)
+
+
+def fourier_transform(input_projection: np.ndarray, epsilon: float, norm_type='L1'):
+    """
+    Fourier Transform of the function defining edges between graph nodes.
+    """
+    if norm_type == 'L1':
+        return np.prod(np.sin(2.0 * epsilon* input_projection) / input_projection)
+    elif norm_type == 'L2':
+        pass
+    else:
+        pass 
+
+
+def construct_random_features(positions: np.ndarray, 
+                              random_projection_creator: Callable, 
+                              density_function: Callable, 
+                              num_rand_features: int, 
+                              fourier_transform: Callable, 
+                              epsilon: float):
+    """
+    this function is used by graph diffusion GFIntegrator
+    
+    parameter definitions are the same as in graph_diffusion_gf_integrator
+    """
+    dim = len(positions[0])
+    projection_matrix = random_projection_creator(num_rand_features, dim)
+    projected_positions = np.einsum('md,nd->nm', projection_matrix, positions)
+    exp_projected_positions = np.exp(2.0 * np.pi * 1j * projected_positions)
+    ft_with_eps = lambda x: fourier_transform(x, epsilon)
+    fts = np.apply_along_axis(ft_with_eps, 1, projection_matrix)
+    dens = np.apply_along_axis(density_function, 1, projection_matrix)
+    renormalizers = fts / dens
+    rfs = np.einsum('nm,m->nm',exp_projected_positions, renormalizers)
+    return (1.0 / np.sqrt(num_rand_features)) * rfs
+
+
+

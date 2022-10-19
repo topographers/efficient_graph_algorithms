@@ -30,7 +30,7 @@ def base_compute_clustering(adjacency_lists: List[List[int]],
                             aset_indices: List[int], 
                             bset_indices: List[int], 
                             sources: List[int], 
-                            unit_size: float) 
+                            unit_size: float) \
                             ->Tuple[List[List[List[int]]], List[List[List[int]]], List[List[int]]]:
     """ 
     a base function for clustering 
@@ -254,7 +254,7 @@ def fast_multiply(hankel_row_column: np.ndarray,
     is obtained from the ith row of H by multiplying with a fixed multiplier
     for i = 0,...,M-2.  
     """
-    assert len(hankel_row_column) == 1 or multiplicative_shift, 
+    assert len(hankel_row_column) == 1 or multiplicative_shift, \
             "Either len(hankle_row_column) should be 1, or multiplicative_shift should be True"
         
     if len(hankel_row_column) == 1:
