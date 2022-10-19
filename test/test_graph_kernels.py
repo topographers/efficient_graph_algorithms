@@ -1,5 +1,5 @@
 import networkx as nx
-from ega.algorithms.graph_kernels import *
+from ega.algorithms.graph_kernels import GraphKernel
 import time
 
 # TODO: TEST SPEED AND ACCURACY WITH https://github.com/BorgwardtLab/GraphKernels

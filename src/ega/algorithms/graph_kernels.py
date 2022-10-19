@@ -6,6 +6,16 @@ import scipy.sparse.linalg as linalg
 from scipy import sparse
 import networkx as nx
 import h5py
+from numpy.linalg import inv
+from scipy.spatial.distance import pdist, squareform
+import logging
+ 
+# Create and configure logger
+# Creating an object
+# logging level set to INFO
+logging.basicConfig(format='%(message)s',
+                    level=logging.INFO)
+LOG = logging.getLogger(__name__)
 
 
 def zscore(proj, samples=None, mean=None, std=None):
@@ -50,13 +60,13 @@ def istvan(proj, samples=None, mean=None, std=None):
 # implementation here, NOT the original paper where the kernel has been proposed.
 
 # Random Walk (RW) kernel (Cowen et al., 2017)
-def rw_kernel(A, nRw):
+def random_walk_kernel(A, nRw):
     Asp = sparse.csc_matrix(A / A.sum(axis=0))
     return np.asarray((Asp**nRw).todense())
 
 
 # Random Walk with Restart (RWR) kernel (Cowen et al., 2017)
-def rwr_kernel(A, alpha):
+def random_walk_with_restart_kernel(A, alpha):
     if alpha != 0.0:
         Dinv = np.diag(1 / A.sum(axis=0))
         W = np.dot(A, Dinv)
@@ -68,9 +78,7 @@ def rwr_kernel(A, alpha):
 
 # Diffusion State Distance (DSD) (Cowen et al., 2017)
 # Note: this is a distance matrix, NOT a kernel (similarity)!
-def dsd_kernel(adjacency, nRw):
-    from numpy.linalg import inv
-    from scipy.spatial.distance import pdist, squareform
+def diffusion_state_distance(adjacency, nRw):
 
     adjacency = np.asmatrix(adjacency)
     n = adjacency.shape[0]
@@ -95,7 +103,7 @@ def heat_kernel(A, t):
 
 
 # Interconnectedness (ICN) kernel (Hsu et al., 2011)
-def icn_kernel(A):
+def interconnected_kernel(A):
     Dinv = np.sqrt(A.sum(axis=0))
     Asp = sparse.csc_matrix(A)
     return np.asarray((Asp**2 + Asp * 2).todense()) / (Dinv[:, None] * Dinv)
@@ -192,11 +200,11 @@ class GraphKernel:
                 newline=False,
                 verbose_level=1,
             )
-            self.kernels[kid] = rw_kernel(self.adj, nRw)
+            self.kernels[kid] = random_walk_kernel(self.adj, nRw)
             self.speak("Complete.", newline=True)
         return kid
 
-    def eval_rwr_kernel(self, alpha):
+    def eval_random_walk_with_restart_kernel(self, alpha):
         """
         Random Walk with Restart kernel.
         Parameters
@@ -215,11 +223,11 @@ class GraphKernel:
                 newline=False,
                 verbose_level=1,
             )
-            self.kernels[kid] = rwr_kernel(self.adj, alpha)
+            self.kernels[kid] = random_walk_with_restart_kernel(self.adj, alpha)
             self.speak("Complete.", newline=True)
         return kid
 
-    def eval_dsd_kernel(self, nRw):
+    def eval_diffusion_state_distance(self, nRw):
         """
         Diffusion State Distance kernel, as defined in Cao et al., 2013.
         Parameters
@@ -238,7 +246,7 @@ class GraphKernel:
                 newline=False,
                 verbose_level=1,
             )
-            self.kernels[kid] = dsd_kernel(self.adj, nRw)
+            self.kernels[kid] = diffusion_state_distance(self.adj, nRw)
             self.speak("Complete.", newline=True)
         return kid
 
@@ -289,7 +297,7 @@ class GraphKernel:
             self.speak("Complete.", newline=True)
         return kid
 
-    def eval_icn_kernel(self):
+    def eval_interconnected_kernel(self):
         kid = "icn"
         if kid not in self.kernels:
             self.speak(
@@ -297,7 +305,7 @@ class GraphKernel:
                 newline=False,
                 verbose_level=1,
             )
-            self.kernels[kid] = icn_kernel(self.adj)
+            self.kernels[kid] = interconnected_kernel(self.adj)
             self.speak("Complete.", newline=True)
         return kid
 
@@ -647,7 +655,6 @@ class GraphKernel:
         description : str
             Optional description text embedded in the kernel savefile
         """
-        import h5py
 
         if kidlist is None:
             kidlist = self.kernels.keys()
@@ -671,7 +678,6 @@ class GraphKernel:
         filename : str
             Path of savefile
         """
-        import h5py
 
         if hasattr(self, "kernels") and len(self.kernels) > 0:
             warnings.warn("Loaded GraphKernel is overwriting an existing kernel set.")
@@ -700,13 +706,13 @@ class GraphKernel:
     def kid2func(self, kid):
         kid = kid.split("_")
         if kid[0] == "rw":
-            return partial(rw_kernel, nRw=int(kid[1]))
+            return partial(random_walk_kernel, nRw=int(kid[1]))
         elif kid[0] == "rwr":
-            return partial(rwr_kernel, alpha=float(kid[1]))
+            return partial(random_walk_with_restart_kernel, alpha=float(kid[1]))
         elif kid[0] == "hk":
             return partial(heat_kernel, t=float(kid[1]))
         elif kid[0] == "dsd":
-            return partial(dsd_kernel, nRw=int(kid[1]))
+            return partial(diffusion_state_distance, nRw=int(kid[1]))
         elif kid[0] == "ist":
             return istvan_kernel
 
