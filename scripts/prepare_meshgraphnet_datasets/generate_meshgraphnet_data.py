@@ -357,7 +357,10 @@ def build_graph(inputs):
     return {'adjacency_list':adjacency_list, 
             'weight_list':weight_list, 
             'node_features':node_features, 
-            'vertices':vertices}
+            'vertices':vertices,
+            'world_pos': np.array(world_pos), 
+            'prev_world_pos': np.array(prev_world_pos),
+            'faces': np.array(cells)}
 
 
 def main():
