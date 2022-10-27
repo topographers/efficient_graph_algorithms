@@ -32,8 +32,10 @@ import torch.nn.functional as F
 import collections 
 import trimesh
 import pickle
+from typing import List, Callable
 # mesh graph data should be put under this path 
 from ega import default_meshgraphnet_dataset_path
+from ega.util.mesh_utils import neighbors_in_cyclic_order, random_circular_rotation
 
 
 def get_args_parser():
@@ -320,6 +322,61 @@ def process_trajectory(trajectory_data, params, model_type, dataset_dir, add_tar
     return trajectory
 
 
+
+
+def faces_to_adjacency_matrices(faces: np.ndarray, nb_nodes: int, seed = 0) -> List[List[int]]:
+    """
+    this function is heavily built on the original trimesh_to_adjacency_matrices, 
+    the only difference is that the input here replaces trimesh into faces, which is a 2d array of size N by 3.
+    Each row of the faces matrix represents the 3 vertices of that face 
+    """
+    vertices = list(range(nb_nodes))
+    faces_adj_to_vertices = []
+    adjacency_lists = []
+    for _  in range(len(vertices)):
+        faces_adj_to_vertices.append([])  
+        adjacency_lists.append([])  
+    for index in range(len(faces)):
+        v1, v2, v3 = faces[index]
+        faces_adj_to_vertices[v1].append(index)
+        faces_adj_to_vertices[v2].append(index)
+        faces_adj_to_vertices[v3].append(index)
+    for index in range(len(faces_adj_to_vertices)):
+        #print(index)
+        vertex_adjacency_list = []
+        edge_dict = dict()
+        rev_edge_dict = dict()
+        first_vertex = 0
+        for face_index in faces_adj_to_vertices[index]:
+            x, y = neighbors_in_cyclic_order(faces[face_index], index)
+            edge_dict[x] = y
+            rev_edge_dict[y] = x
+            first_vertex = x
+        next_vertex = first_vertex
+        while True:
+            mesh_edge_reached = False
+            vertex_adjacency_list.append(next_vertex)
+            if not next_vertex in edge_dict:
+                mesh_edge_reached = True
+            else:
+                next_vertex = edge_dict[next_vertex]
+            if next_vertex == first_vertex and not mesh_edge_reached:
+                break
+            elif mesh_edge_reached:
+                vertex_adjacency_list = []
+                while True:
+                    vertex_adjacency_list.append(next_vertex)
+                    if next_vertex in rev_edge_dict:
+                        next_vertex = rev_edge_dict[next_vertex] 
+                    else:
+                        break  
+                vertex_adjacency_list.reverse() 
+                break 
+        adjacency_lists[index] = vertex_adjacency_list
+    return random_circular_rotation(adjacency_lists, seed)
+
+
+
 def build_graph(inputs):
     """
     Builds input graph.
@@ -334,20 +391,17 @@ def build_graph(inputs):
     node_features = np.array(node_features) # we use numpy in this version. 
     cells = inputs['cells']
     
-    decomposed_cells = triangles_to_edges(cells)
-    senders, receivers = decomposed_cells['two_way_connectivity']
-    relative_world_pos = (torch.index_select(input=world_pos, dim=0, index=senders) -
-                          torch.index_select(input=world_pos, dim=0, index=receivers))
-    distance_between_node_pairs = torch.norm(relative_world_pos, dim = -1) 
-    senders, receivers, distance_between_node_pairs = np.array(senders), np.array(receivers), np.array(distance_between_node_pairs)
-
     n_nodes = len(node_features)
-    adjacency_list = [[] for i in range(n_nodes)]
-    weight_list = [[] for i in range(n_nodes)]
-    for sender, receiver, dist in zip(senders, receivers, distance_between_node_pairs):
-        adjacency_list[sender].append(receiver)
-        weight_list[sender].append(dist)
     vertices = list(range(n_nodes))
+    adjacency_list = faces_to_adjacency_matrices(cells.numpy(), n_nodes)
+    
+
+    weight_list = [[] for i in range(n_nodes)]
+    for i, neighbors_i in enumerate(adjacency_list):
+        for nb in neighbors_i:
+            dist = np.linalg.norm(world_pos[i] - world_pos[nb])
+            weight_list[i].append(dist)
+    
     """
     # we use trimesh here to get the triangle edges list of each node. 
     # we can also use the following code for visualization 
@@ -390,9 +444,7 @@ def main():
         with open (processed_file, 'wb') as f:
             pickle.dump(meshgraph_list, f)
         print("trajectory {} saved".format(trajectory_index))
-        """
-        object_file = pickle.load(open(processed_file,'rb'))
-        """  
+
     
     
 if __name__ == '__main__':
