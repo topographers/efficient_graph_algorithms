@@ -29,10 +29,9 @@ def neighbors_in_cyclic_order(face: List[int], vertex_index: int) -> List[int]:
     return [v1, v2]    
 
 
-def trimesh_to_adjacency_matrices(mesh: trimesh.base, seed = 0) -> List[List[int]]:
-    """
-    given a trimesh object, this function will output the adjacency lists
-    """
+
+
+def trimesh_to_adjacency_matrices(mesh, seed=0):
     graph = trimesh.graph.vertex_adjacency_graph(mesh)
     vertices = list(graph.nodes)
     faces = mesh.faces
@@ -49,19 +48,37 @@ def trimesh_to_adjacency_matrices(mesh: trimesh.base, seed = 0) -> List[List[int
     for index in range(len(faces_adj_to_vertices)):
         vertex_adjacency_list = []
         edge_dict = dict()
+        rev_edge_dict = dict()
         first_vertex = 0
         for face_index in faces_adj_to_vertices[index]:
             x, y = neighbors_in_cyclic_order(faces[face_index], index)
             edge_dict[x] = y
+            rev_edge_dict[y] = x
             first_vertex = x
         next_vertex = first_vertex
         while True:
+            mesh_edge_reached = False
             vertex_adjacency_list.append(next_vertex)
-            next_vertex = edge_dict[next_vertex]
-            if next_vertex == first_vertex:
+            if not next_vertex in edge_dict:
+                mesh_edge_reached = True
+            else:  
+                next_vertex = edge_dict[next_vertex]
+            if next_vertex == first_vertex and not mesh_edge_reached:
+                break
+            elif mesh_edge_reached:
+                vertex_adjacency_list = []
+                while True:
+                    vertex_adjacency_list.append(next_vertex)
+                    if next_vertex in rev_edge_dict:
+                        next_vertex = rev_edge_dict[next_vertex] 
+                    else:
+                        break  
+                vertex_adjacency_list.reverse() 
                 break
         adjacency_lists[index] = vertex_adjacency_list
     return random_circular_rotation(adjacency_lists, seed)
+
+
 
 
 def adjacency_list_to_sparse_matrix(adjacency_lists: List[List[int]]):
