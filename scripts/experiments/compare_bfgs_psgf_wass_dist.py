@@ -7,7 +7,7 @@ from ega.util.blur_on_mesh import blur_on_mesh
 from ega.algorithms.convolutional_distance import ConvolutionalDistance
 from ega.visualization.mesh_visualization import simple3d_save_gif
 from ega.algorithms.brute_force import BFGFIntegrator
-from ega.algorithms.separation_gf_integrator import PlaceboSeparationGFIntegrator
+from ega.algorithms.separation_gf_integrator import SeparationGFIntegrator
 from ega.util.gaussian_kernel import GaussianKernel
 import ega.util.mesh_utils as mu
 from ega.evaluation.evaluator import Evaluator
@@ -80,7 +80,7 @@ def main():
     
     # separation integrator initialization
     start_time = time.time()
-    psgf_integrator = PlaceboSeparationGFIntegrator(adjacency_lists, weights_lists, vertices, kernel_function)
+    psgf_integrator = SeparationGFIntegrator(adjacency_lists, weights_lists, vertices, kernel_function)
     end_time = time.time()
     print('planer separator preprocessing time: ', end_time - start_time)
 
