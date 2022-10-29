@@ -1,4 +1,7 @@
-##test other kernels
+"""
+Code to compute various graph kernels. This is just used to test our variants by plugging in the kernels. 
+For more optimal workflow, import kernels from https://github.com/ysig/GraKeL which is much faster. 
+"""
 from functools import partial
 import warnings
 import numpy as np
@@ -9,12 +12,11 @@ import h5py
 from numpy.linalg import inv
 from scipy.spatial.distance import pdist, squareform
 import logging
- 
+
 # Create and configure logger
 # Creating an object
 # logging level set to INFO
-logging.basicConfig(format='%(message)s',
-                    level=logging.INFO)
+logging.basicConfig(format="%(message)s", level=logging.INFO)
 LOG = logging.getLogger(__name__)
 
 
@@ -41,6 +43,7 @@ def onetail(proj, samples):
     :param proj:
     :param samples:
     :return pvalue: fraction of times the node projection is greater than random samples
+    i.e. a one-tailed test.
     """
     return (proj[:, None] > samples).sum(axis=1) / samples.shape[0]
 
@@ -118,6 +121,11 @@ def istvan_kernel2(A):
 
 
 class GIDMapper:
+    """
+    A simple class to keep track of various nodes in a graph by creating a dictionary of nodes,
+    essentially giving an order to the nodes.
+    """
+
     def __init__(self, nodelist):
         self.nodelist = nodelist
         self._gid2id_dict = {gid: i for i, gid in enumerate(nodelist)}
@@ -154,12 +162,9 @@ class GraphKernel:
         weight : str
             Name of the NetworkX edge property to be considered as edge weight for weighted graphs
             If graph is provided as numpy adjacency matrix this parameter is ignored
-        verbose_level : int
-            Level of verbosity. Current implemented levels: 0 for no output, 1 for basic output
         """
-        self.verbose_level = verbose_level
         if savefile is None:
-            self.speak("Initializing GraphKernel...", newline=False, verbose_level=1)
+            logging.info("Initializing GraphKernel...")
             if isinstance(graph, np.ndarray) or isinstance(
                 graph, np.matrixlib.defmatrix.matrix
             ):
@@ -177,7 +182,7 @@ class GraphKernel:
             self.nodelist = nodelist
             self.gm = GIDMapper(nodelist=nodelist)
             self.kernels = {}
-            self.speak("Complete.", newline=True, verbose_level=1)
+            logging.info("Complete.", newline=True)
         else:
             self.load(savefile)
 
@@ -195,13 +200,11 @@ class GraphKernel:
         """
         kid = "rw_" + str(nRw)
         if kid not in self.kernels:
-            self.speak(
+            logging.info(
                 "Initializing RW kernel (this may take a while)...",
-                newline=False,
-                verbose_level=1,
             )
             self.kernels[kid] = random_walk_kernel(self.adj, nRw)
-            self.speak("Complete.", newline=True)
+            logging.info("Complete.")
         return kid
 
     def eval_random_walk_with_restart_kernel(self, alpha):
@@ -218,13 +221,9 @@ class GraphKernel:
         """
         kid = "rwr_" + str(alpha)
         if kid not in self.kernels:
-            self.speak(
-                "Initializing RWR kernel (this may take a while)...",
-                newline=False,
-                verbose_level=1,
-            )
+            logging.info("Initializing RWR kernel (this may take a while)...")
             self.kernels[kid] = random_walk_with_restart_kernel(self.adj, alpha)
-            self.speak("Complete.", newline=True)
+            logging.info("Complete.")
         return kid
 
     def eval_diffusion_state_distance(self, nRw):
@@ -241,13 +240,9 @@ class GraphKernel:
         """
         kid = "dsd_" + str(nRw)
         if kid not in self.kernels:
-            self.speak(
-                "Initializing DSD kernel (this may take a while)...",
-                newline=False,
-                verbose_level=1,
-            )
+            logging.info("Initializing DSD kernel (this may take a while)...")
             self.kernels[kid] = diffusion_state_distance(self.adj, nRw)
-            self.speak("Complete.", newline=True)
+            logging.info("Complete.")
         return kid
 
     def eval_heat_kernel(self, t):
@@ -264,49 +259,33 @@ class GraphKernel:
         """
         kid = "hk_" + str(t)
         if kid not in self.kernels:
-            self.speak(
-                "Initializing heat kernel (this may take a while)...",
-                newline=False,
-                verbose_level=1,
-            )
+            logging.info("Initializing heat kernel (this may take a while)...")
             self.kernels[kid] = heat_kernel(self.adj, t)
-            self.speak("Complete.", newline=True)
+            logging.info("Complete.")
         return kid
 
     def eval_istvan_kernel(self):
         kid = "ist"
         if kid not in self.kernels:
-            self.speak(
-                "Initializing Istvan kernel (this may take a while)...",
-                newline=False,
-                verbose_level=1,
-            )
+            logging.info("Initializing Istvan kernel (this may take a while)...")
             self.kernels[kid] = istvan_kernel(self.adj)
-            self.speak("Complete.", newline=True)
+            logging.info("Complete.")
         return kid
 
     def eval_istvan2_kernel(self):
         kid = "ist2"
         if kid not in self.kernels:
-            self.speak(
-                "Initializing Istvan kernel (this may take a while)...",
-                newline=False,
-                verbose_level=1,
-            )
+            logging.info("Initializing Istvan kernel (this may take a while)...")
             self.kernels[kid] = istvan_kernel2(self.adj)
-            self.speak("Complete.", newline=True)
+            logging.info("Complete.")
         return kid
 
     def eval_interconnected_kernel(self):
         kid = "icn"
         if kid not in self.kernels:
-            self.speak(
-                "Initializing ICN kernel (this may take a while)...",
-                newline=False,
-                verbose_level=1,
-            )
+            logging.info("Initializing ICN kernel (this may take a while)...")
             self.kernels[kid] = interconnected_kernel(self.adj)
-            self.speak("Complete.", newline=True)
+            logging.info("Complete.")
         return kid
 
     def eval_kernel_statistics(
@@ -372,11 +351,7 @@ class GraphKernel:
             rangefunc = tnrange
         except ImportError:  # if tqdm is not present it will fallback on standard loop
             rangefunc = range
-        self.speak(
-            "Calculating kernel statistics (this may take a long while)...",
-            newline=False,
-            verbose_level=1,
-        )
+        logging.info("Calculating kernel statistics (this may take a long while)...")
         for k in rangefunc(N):
             rdmgraph = gen_func(graph)
             rdmadj = np.asarray(
@@ -389,7 +364,7 @@ class GraphKernel:
             S = S + (x - M) * (x - oldM)
         self.kernels[kernel + "_" + statprefix + "mean"] = M
         self.kernels[kernel + "_" + statprefix + "var"] = np.sqrt(S / (N - 1))
-        self.speak("Complete", newline=True, verbose_level=1)
+        logging.info("Complete")
 
     def onehot_encode(self, nodeset, norm=False):
         if (
@@ -660,7 +635,7 @@ class GraphKernel:
             kidlist = self.kernels.keys()
         elif isinstance(kidlist, str):
             kidlist = [kidlist]
-        self.speak("Saving kernels...", newline=False, verbose_level=1)
+        logging.info("Saving kernels...")
         with h5py.File(filename, "w") as hf:
             for kid in kidlist:
                 hf.create_dataset(kid, data=self.kernels[kid], compression="gzip")
@@ -668,7 +643,7 @@ class GraphKernel:
             hf.create_dataset("adjacency", data=self.adj, compression="gzip")
             if description is not None:
                 hf.create_dataset("description", data=description)
-        self.speak("Complete.", newline=True, verbose_level=1)
+        logging.info("Complete.")
 
     def load(self, filename):
         """
@@ -681,7 +656,7 @@ class GraphKernel:
 
         if hasattr(self, "kernels") and len(self.kernels) > 0:
             warnings.warn("Loaded GraphKernel is overwriting an existing kernel set.")
-        self.speak("Loading kernels...", newline=False, verbose_level=1)
+        logging.info("Loading kernels...")
         with h5py.File(filename, "r") as hf:
             data = {}
             for key in hf.keys():
@@ -695,7 +670,7 @@ class GraphKernel:
                     data[key] = hf[key][:]
         self.kernels = data
         self.gm = GIDMapper(nodelist=self.nodelist)
-        self.speak("Complete.", newline=True, verbose_level=1)
+        logging.info("Complete.")
 
     def rebuild_nx_graph(self):
         graph = nx.from_numpy_matrix(self.adj)
@@ -718,9 +693,3 @@ class GraphKernel:
 
     def __getitem__(self, kid):
         return self.kernels[kid]
-
-    def speak(self, message, newline=False, verbose_level=1):
-        if self.verbose_level >= verbose_level:
-            print(message)
-            if newline:
-                print

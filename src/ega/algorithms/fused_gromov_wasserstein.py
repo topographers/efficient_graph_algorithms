@@ -3,10 +3,8 @@
 
 import numpy as np
 import ot
-import optim
+import optimization
 from ega.util.wasserstein_utils import dist, reshaper
-
-# from bergman_sinkhorn_algorithms import sinkhorn_scaling
 from scipy import stats
 from scipy.sparse import random
 
@@ -253,7 +251,7 @@ def gw_lp(C1, C2, p, q, loss_fun="square_loss", alpha=1, amijo=True, G0=None, **
         return gwggrad(constC, hC1, hC2, G)
 
     # TODO: TEST THIS VALUE AGAINST POT
-    return optim.cg(
+    return optimization.cg(
         a=p,
         b=q,
         M=M,
@@ -342,8 +340,7 @@ def fgw_lp(
     def df(G):
         return gwggrad(constC, hC1, hC2, G)
 
-    # TODO: TEST THIS VALUE AGAINST POT
-    return optim.cg(
+    return optimization.cg(
         p,
         q,
         (1 - alpha) * M,
