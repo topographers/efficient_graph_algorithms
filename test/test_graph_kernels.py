@@ -11,19 +11,19 @@ gk = GraphKernel(g, verbose_level=1)  # instantiates the kernel class
 
 
 start_time = time.time()
-rw = gk.eval_rw_kernel(2)  # 2 random walks
+rw = gk.eval_random_walk_kernel(2)  # 2 random walks
 elapsed = time.time() - start_time
 print("Time to generate Random Walk", elapsed)
 ##############################
 
 start_time = time.time()
-rwr = gk.eval_rwr_kernel(0.3)  # restart prob=.3
+rwr = gk.eval_random_walk_with_restart_kernel(0.3)  # restart prob=.3
 elapsed = time.time() - start_time
 print("Time to generate Random Walk with Restart", elapsed)
 ##############
 
 start_time = time.time()
-dsd = gk.eval_dsd_kernel(3)  # number of random walks
+dsd = gk.eval_diffusion_state_distance(3)  # number of random walks
 elapsed = time.time() - start_time
 print("Time to generate Diffusion state kernel", elapsed)
 ######################
@@ -35,7 +35,7 @@ print("Time to generate heat kernel", elapsed)
 ######################
 
 start_time = time.time()
-icn = gk.eval_icn_kernel()
+icn = gk.eval_interconnected_kernel()
 elapsed = time.time() - start_time
 print("Time to generate ICN", elapsed)
 ##########################

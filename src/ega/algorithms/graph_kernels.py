@@ -186,7 +186,7 @@ class GraphKernel:
         else:
             self.load(savefile)
 
-    def eval_rw_kernel(self, nRw):
+    def eval_random_walk_kernel(self, nRw):
         """
         Simple Random Walk kernel.
         Parameters
