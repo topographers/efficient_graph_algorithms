@@ -4,6 +4,7 @@ from simple_3dviz.behaviours.movements import RotateModel
 from simple_3dviz import render
 
 import numpy as np
+from typing import List
 
 import plotly.graph_objects as go
 from plotly.offline import plot
@@ -50,7 +51,8 @@ def plot_mesh(world_pos: np.ndarray,
               interpolated_fields: np.ndarray, 
               snapshot_index: int, 
               scale: int = 15, 
-              saveimg: bool = False):
+              saveimg: bool = False, 
+              names: List[str] = ['true_velocities', 'interpolated_velocities']):
     """
     this function uses plotly for meshgraphnet data visualization.
     predicted and true fields(velocities) of vertices to be interpolated are shown as arrows on the 3d plot 
@@ -77,12 +79,12 @@ def plot_mesh(world_pos: np.ndarray,
                            marker = dict( size = 2, color = "black"))
 
     vx_true, vy_true, vz_true = true_arrow_matrix
-    true_velocities = go.Scatter3d(x=vx_true, y=vy_true, z=vz_true, mode='lines', name='true_velocities', 
+    true_velocities = go.Scatter3d(x=vx_true, y=vy_true, z=vz_true, mode='lines', name=names[0], 
                                    line = dict(color = 'red', width=4))
 
     vx_interpolated, vy_interpolated, vz_interpolated = interpolated_arrow_matrix
     interpolated_velocities = go.Scatter3d(x=vx_interpolated, y=vy_interpolated, z=vz_interpolated,
-        mode='lines', name='interpolated_velocities', line = dict(color = 'blue', width=4))
+        mode='lines', name=names[1], line = dict(color = 'blue', width=4))
     
     fig = go.Figure(data=[points, mesh, true_velocities, interpolated_velocities, ],)
 
@@ -91,4 +93,3 @@ def plot_mesh(world_pos: np.ndarray,
         fig.write_image(
             os.path.join(default_meshgraphnet_dataset_path,'flag_simple','flag_{}.png'.format(snapshot_index)))
     plot(fig,filename="vector.html",auto_open=True,image='png',image_height=1000,image_width=1100)
-
