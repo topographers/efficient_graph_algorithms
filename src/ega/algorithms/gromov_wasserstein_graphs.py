@@ -9,7 +9,12 @@ Basic functionalities include:
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.special import softmax
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Callable
+from ega.util.mesh_utils import (
+    random_projection_creator,
+    density_function,
+    fourier_transform,
+)
 
 
 def node_distribution_similarity(
@@ -155,6 +160,7 @@ def node_cost_st(
     p_t: np.ndarray,
     loss_type: str = "L2",
     prior: float = None,
+    method_type: str = None,
 ) -> np.ndarray:
     """
     Calculate invariant cost between the nodes in different graphs based on learned optimal transport
@@ -166,21 +172,28 @@ def node_cost_st(
         loss_type: 'L2' the Euclidean loss type for Gromov-Wasserstein discrepancy
                    'KL' the KL-divergence loss type for Gromov-Wasserstein discrepancy
         prior: whether use node distribution similarity matrix as a prior
+        method_type: whether to use fast matrix multiplication
 
     Returns:
         cost_st: (n_s, n_t) array, the estimated invariant cost between the nodes in two graphs
     """
-    n_s = cost_s.shape[0]
-    n_t = cost_t.shape[0]
-    if loss_type == "L2":
-        f1_st = np.repeat((cost_s**2) @ p_s, n_t, axis=1)
-        f2_st = np.repeat(((cost_t**2) @ p_t).T, n_s, axis=0)
-    else:
+    if method_type is None:
+        n_s = cost_s.shape[0]
+        n_t = cost_t.shape[0]
+        if loss_type == "L2":
+            f1_st = np.repeat((cost_s**2) @ p_s, n_t, axis=1)
+            f2_st = np.repeat(((cost_t**2) @ p_t).T, n_s, axis=0)
+        else:
 
-        f1_st = np.repeat(
-            np.matmul(cost_s * np.log(cost_s + 1e-15) - cost_s, p_s), n_t, axis=1
+            f1_st = np.repeat(
+                np.matmul(cost_s * np.log(cost_s + 1e-15) - cost_s, p_s), n_t, axis=1
+            )
+            f2_st = np.repeat((cost_t @ p_t).T, n_s, axis=0)
+
+    else:
+        raise ValueError(
+            "Invariant cost is not supported by fast matrix multiplication methods as it needs to materializes the matrices first"
         )
-        f2_st = np.repeat((cost_t @ p_t).T, n_s, axis=0)
 
     cost_st = f1_st + f2_st
     if prior is not None:
@@ -195,6 +208,9 @@ def node_cost(
     trans: np.ndarray,
     cost_st: np.ndarray,
     loss_type: str = "L2",
+    method_type: str = None,
+    source_integrator: Callable = None,
+    target_integrator: Callable = None,
 ) -> np.ndarray:
     """
     Calculate the cost between the nodes in different graphs based on learned optimal transport
@@ -205,17 +221,36 @@ def node_cost(
         cost_st: (n_s, n_t) array, the estimated invariant cost between the nodes in two graphs
         loss_type: 'L2' the Euclidean loss type for Gromov-Wasserstein discrepancy
                    'KL' the KL-divergence loss type for Gromov-Wasserstein discrepancy
+        method_type: Any string now defaults to graph diffusion fast matrix multiplication
+        source_integrator : Graph field integrator on source graph
+        target_integrator : Graph field integrator on target graph
+
 
     Returns:
         cost: (n_s, n_t) array, the estimated cost between the nodes in two graphs
     """
-    if loss_type == "L2":
-        cost = cost_st - 2 * (cost_s @ trans @ cost_t.T)
+    if method_type is None:
+        if loss_type == "L2":
+            cost = cost_st - 2 * (cost_s @ trans @ cost_t.T)
+        else:
+            cost = cost_st - np.matmul(cost_s @ trans, (np.log(cost_t + 1e-15)).T)
+
     else:
-        cost = cost_st - np.matmul(cost_s @ trans, (np.log(cost_t + 1e-15)).T)
+        if loss_type == "L2":
+            cost_partial = source_integrator.integrate_graph_field(trans)
+            cost = (
+                cost_st
+                - 2 * (target_integrator.integrate_graph_field(cost_partial.T)).T
+            )
+            del cost_partial
+
+        else:
+            cost_partial = source_integrator.integrate_graph_field(trans)
+            cost = cost_st - np.matmul(cost_partial, (np.log(cost_t + 1e-15)).T)
     return cost
 
 
+##TODO:TRY TO INJECT FAST MATRIX MULTIPLICATION
 def gromov_wasserstein_average(
     transports: Dict, costs: Dict, p_center: np.ndarray, weights: Dict, loss_type: str
 ) -> np.ndarray:
@@ -254,12 +289,21 @@ def gromov_wasserstein_average(
 
 
 def gromov_wasserstein_discrepancy(
-    cost_s: csr_matrix,
-    cost_t: csr_matrix,
-    p_s: np.ndarray,
-    p_t: np.ndarray,
-    ot_hyperpara: Dict,
+    cost_s: csr_matrix = None,
+    cost_t: csr_matrix = None,
+    p_s: np.ndarray = None,
+    p_t: np.ndarray = None,
+    ot_hyperpara: Dict = None,
     trans0=None,
+    method_type: str = None,
+    source_positions: np.ndarray = None,
+    target_positions: np.ndarray = None,
+    source_epsilon: float = None,
+    target_epsilon: float = None,
+    source_lambda_par: float = None,
+    target_lambda_par: float = None,
+    num_rand_features: int = None,
+    dim: int = None,
 ) -> Tuple[np.ndarray, float, np.ndarray]:
     """
     Calculate Gromov-Wasserstein discrepancy with optionally-updated source probability
@@ -271,6 +315,16 @@ def gromov_wasserstein_discrepancy(
         p_t: (n_t, 1) np.ndarray, the predefined target distribution
         ot_hyperpara: dictionary of hyperparameter
         trans0: optional (n_s, n_t) array, the initial transport
+        The rest of the parameters are optional and only used for fast matrix vector multiplication.
+        method_type : Anything other than None defaults to fast matrix vector multiplication
+        source_positions : (n_s, dim) location of points in d-dim Euclidean space.
+        target_positions : (n_t, dim) location of points in d-dim Euclidean space.
+        source_epsilon : parameter that controls the epsilon neighbor of source points
+        target_epsilon : parameter that controls the epsilon neighbor of target points
+        source_lambda_par : diffusion parameter for source graph.
+        target_lambda_par : diffusion parameter for target graph.
+        num_rand_features : Number of random features
+        dim : Input dimensionality of the data
 
     Returns:
         trans0: (n_s, n_t) array, the optimal transport
@@ -278,7 +332,11 @@ def gromov_wasserstein_discrepancy(
         p_s: (n_s, 1) array, the optimal source distribution
     """
 
-    n_s = cost_s.shape[0]
+    if method_type is None:
+        n_s = cost_s.shape[0]
+    else:
+        n_s = source_positions.shape[0]
+
     if ot_hyperpara["update_p"]:
         theta = np.zeros((n_s, 1))
         p_s = softmax(theta)
@@ -292,21 +350,76 @@ def gromov_wasserstein_discrepancy(
 
     t = 0
     relative_error = np.inf
+    if method_type is not None:
+        if ot_hyperpara["loss_type"] == "L2":
+            dfgf_s_integrator = DFGFIntegrator(
+                source_positions,
+                source_epsilon,
+                source_lambda_par,
+                num_rand_features,
+                dim,
+                random_projection_creator,
+                density_function,
+                fourier_transform,
+            )
+            dfgf_t_integrator = DFGFIntegrator(
+                target_positions,
+                target_epsilon,
+                target_lambda_par,
+                num_rand_features,
+                dim,
+                random_projection_creator,
+                density_function,
+                fourier_transform,
+            )
+        else:
+            dfgf_s_integrator = DFGFIntegrator(
+                source_positions,
+                source_epsilon,
+                source_lambda_par,
+                num_rand_features,
+                dim,
+                random_projection_creator,
+                density_function,
+                fourier_transform,
+            )
+            dfgf_t_integrator = None
     # calculate invariant cost matrix
-    cost_st = node_cost_st(
+    cost_st = node_cost_st_as(
         cost_s,
         cost_t,
         p_s,
         p_t,
         loss_type=ot_hyperpara["loss_type"],
         prior=ot_hyperpara["node_prior"],
+        method_type=None,
     )
     while (
         relative_error > ot_hyperpara["iter_bound"]
         and t < ot_hyperpara["outer_iteration"]
     ):
         # update optimal transport via Sinkhorn iteration method
-        cost = node_cost(cost_s, cost_t, trans0, cost_st, ot_hyperpara["loss_type"])
+        if method_type is None:
+            cost = node_cost(
+                cost_s,
+                cost_t,
+                trans0,
+                cost_st,
+                ot_hyperpara["loss_type"],
+                method_type=method_type,
+            )
+        else:
+            cost = node_cost(
+                cost_s=None,
+                cost_t=None,
+                trans=trans0,
+                cost_st=cost_st,
+                loss_type=ot_hyperpara["loss_type"],
+                method_type=method_type,
+                source_integrator=dfgf_s_integrator,
+                target_integrator=dfgf_t_integrator,
+            )
+
         if ot_hyperpara["ot_method"] == "proximal":
             trans, a = sinkhorn_knopp_iteration(
                 cost=cost,
@@ -344,11 +457,31 @@ def gromov_wasserstein_discrepancy(
                 ot_hyperpara["alpha"],
             )
     # print('proximal iteration = {}'.format(t))
-    cost = node_cost(cost_s, cost_t, trans0, cost_st, ot_hyperpara["loss_type"])
+    if method_type is None:
+        cost = node_cost(
+            cost_s,
+            cost_t,
+            trans0,
+            cost_st,
+            ot_hyperpara["loss_type"],
+            method_type=method_type,
+        )
+    else:
+        cost = node_cost(
+            cost_s=None,
+            cost_t=None,
+            trans=trans0,
+            cost_st=cost_st,
+            loss_type=ot_hyperpara["loss_type"],
+            method_type=method_type,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+        )
     d_gw = (cost * trans0).sum()
     return trans0, d_gw, p_s
 
 
+## TODO: inject the fast variant
 def gromov_wasserstein_barycenter(
     costs: Dict,
     p_s: Dict,
