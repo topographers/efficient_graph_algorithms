@@ -176,7 +176,18 @@ def gwggrad(constC, hC1, hC2, T):
     return 2 * tensor_product(constC, hC1, hC2, T)
 
 
-def gw_lp(C1, C2, p, q, loss_fun="square_loss", alpha=1, amijo=True, G0=None, log=False, **kwargs):
+def gw_lp(
+    C1,
+    C2,
+    p,
+    q,
+    loss_fun="square_loss",
+    alpha=1,
+    amijo=True,
+    G0=None,
+    log=False,
+    **kwargs
+):
 
     """
     Returns the gromov-wasserstein transport between (C1,p) and (C2,q)
@@ -251,27 +262,43 @@ def gw_lp(C1, C2, p, q, loss_fun="square_loss", alpha=1, amijo=True, G0=None, lo
         return gwggrad(constC, hC1, hC2, G)
 
     # TODO: TEST THIS VALUE AGAINST POT
-    res = optimization.cg(
-        a=p,
-        b=q,
-        M=M,
-        alpha=alpha,
-        f=f,
-        df=df,
-        G0=G0,
-        amijo=amijo,
-        C1=C1,
-        C2=C2,
-        constC=constC,
-        log=False,
-        alpha_min=0,
-        alpha_max=1,
-        **kwargs
-    )
-    if log is False:
-        return res
+    if log:
+        res, log0 = optimization.cg(
+            a=p,
+            b=q,
+            M=M,
+            alpha=alpha,
+            f=f,
+            df=df,
+            G0=G0,
+            amijo=amijo,
+            C1=C1,
+            C2=C2,
+            constC=constC,
+            log=log,
+            alpha_min=0,
+            alpha_max=1,
+        )
+        log0["gw_dist"] = gwloss(constC, hC1, hC2, res)
+        return res, log0
     else:
-        return res, gwloss(constC, hC1, hC2, res)
+        res = optimization.cg(
+            a=p,
+            b=q,
+            M=M,
+            alpha=alpha,
+            f=f,
+            df=df,
+            G0=G0,
+            amijo=amijo,
+            C1=C1,
+            C2=C2,
+            constC=constC,
+            log=log,
+            alpha_min=0,
+            alpha_max=1,
+        )
+        return res
 
 
 def fgw_lp(

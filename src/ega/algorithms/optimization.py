@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Optimization algorithms for OT
-"""
-
-
 import numpy as np
 from scipy.optimize.linesearch import scalar_search_armijo
 from ot.lp import emd
@@ -121,6 +115,9 @@ def do_linesearch(
     M=None,
     alpha_min=None,
     alpha_max=None,
+    method_type=None,
+    source_integrator=None,
+    target_integrator=None,
 ):
 
     """
@@ -150,8 +147,12 @@ def do_linesearch(
         Optimal map found by linearization in the FW algorithm. Only used when amijo=False
     constC : ndarray (ns,nt)
              Constant for the gromov cost. See [3]. Only used when amijo=False
-    M : ndarray (ns,nt), optionnal
-        Cost matrix between the features. Only used when amijo=False
+    M : ndarray (ns,nt), optional
+        Cost matrix between the features. Only used when amijo=False,
+    Optional:
+    method_type : str None defaults to brute force
+    source_integrator : Callable function that does fast matrix multplication for source graph
+    target_integrator : Callable function that does fast matrix multplication for target graph
     Returns
     -------
     alpha : float
@@ -171,14 +172,33 @@ def do_linesearch(
             cost, G, deltaG, Mi, f_val, alpha_min=alpha_min, alpha_max=alpha_max
         )
     else:  # need sym matrices
-        dot = np.dot(np.dot(C1, deltaG), C2)
-        a = (
-            -2 * reg * np.sum(dot * deltaG)
-        )  # -2*alpha*<C1 dt C2,dt> si qqlun est pas bon c'est lui
-        b = np.sum((M + reg * constC) * deltaG) - 2 * reg * (
-            np.sum(dot * G) + np.sum(np.dot(np.dot(C1, G), C2) * deltaG)
-        )
-        c = cost(G)  # f(xt)
+        if method_type is None:
+            dot = np.dot(np.dot(C1, deltaG), C2)
+            a = (
+                -2 * reg * np.sum(dot * deltaG)
+            )  # -2*alpha*<C1 dt C2,dt> si qqlun est pas bon c'est lui
+            b = np.sum((M + reg * constC) * deltaG) - 2 * reg * (
+                np.sum(dot * G) + np.sum(np.dot(np.dot(C1, G), C2) * deltaG)
+            )
+            c = cost(G)  # f(xt)
+
+        else:
+            partial_dcost = source_integrator.integrate_graph_field(deltaG)
+            dot = (
+                target_integrator.integrate_graph_field(partial_dcost.T)
+            ).T  # use symmetry here
+            del partial_dcost
+            a = (
+                -2 * reg * np.sum(dot * deltaG)
+            )  # -2*alpha*<C1 dt C2,dt> si qqlun est pas bon c'est lui
+            partial_cost = source_integrator.integrate_graph_field(G)
+            b1 = (target_integrator.integrate_graph_field(partial_cost.T)).T
+            del partial_cost
+            b = np.sum((M + reg * constC) * deltaG) - 2 * reg * (
+                np.sum(dot * G) + np.sum(b1 * deltaG)
+            )
+            del b1
+            c = cost(G)
 
         alpha = solve_1d_linesearch_quad_funct(a, b, c)
         if alpha_min is not None or alpha_max is not None:
@@ -209,6 +229,9 @@ def cg(
     constC=None,
     alpha_min=0.0,
     alpha_max=1.0,
+    method_type=None,
+    source_integrator=None,
+    target_integrator=None,
 ):
     """
     Solve the general regularized OT problem with conditional gradient
@@ -243,6 +266,10 @@ def cg(
         Print information along iterations
     log : bool, optional
         record log if True
+    Optional:
+    method_type : str None defaults to brute force
+    source_integrator : Callable function that does fast matrix multplication for source graph
+    target_integrator : Callable function that does fast matrix multplication for target graph
     Returns
     -------
     gamma : (ns x nt) ndarray
@@ -315,6 +342,9 @@ def cg(
             M=M,
             alpha_min=alpha_min,
             alpha_max=alpha_max,
+            method_type=method_type,
+            source_integrator=source_integrator,
+            target_integrator=target_integrator,
         )
 
         if alpha is None or np.isnan(alpha):
