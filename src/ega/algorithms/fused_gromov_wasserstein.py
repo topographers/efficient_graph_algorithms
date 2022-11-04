@@ -89,7 +89,7 @@ def init_matrix(C1, C2, p, q, loss_fun="square_loss"):
     return constC, hC1, hC2
 
 
-def tensor_product(constC, hC1, hC2, T):
+def tensor_product(constC, hC1, hC2, T, method_type=None, loss_fun=None, source_integrator=None, target_integrator=None):
 
     """Return the tensor for Gromov-Wasserstein fast computation
     The tensor is computed as described in Proposition 1 Eq. (6) in [1].
@@ -101,6 +101,11 @@ def tensor_product(constC, hC1, hC2, T):
            h1(C1) matrix in Eq. (6)
     hC2 : ndarray, shape (nt, nt)
            h2(C) matrix in Eq. (6)
+    T : ndarray shape (ns,nt) coupling matrix between source and target
+    Optional : 
+    method_type : str None defaults to brute force
+    source_integrator : Callable function that does fast matrix multplication for source graph
+    target_integrator : Callable function that does fast matrix multplication for target graph
     Returns
     -------
     tens : ndarray, shape (ns, nt)
@@ -112,13 +117,25 @@ def tensor_product(constC, hC1, hC2, T):
     International Conference on Machine Learning (ICML). 2016.
     """
 
-    A = -np.dot(np.dot(hC1, T), hC2.T)
+    if method_type is None: 
+        A = -np.dot(np.dot(hC1, T), hC2.T)
+    else: 
+        if loss_fun =='square_loss':
+            partial_prod =  source_integrator.integrate_graph_field(T)
+            A = -2*(target_integrator.integrate_graph_field(partial_prod.T)).T
+            del partial_prod
+        elif loss_fun == 'kl_loss':
+            partial_prod =  source_integrator.integrate_graph_field(T)
+            A = -np.dot(partial_prod, hC2.T)
+            del partial_prod
+        else :
+            raise NotImplementedError("Other types of losses are not currently supported.")
     tens = constC + A
 
     return tens
 
 
-def gwloss(constC, hC1, hC2, T):
+def gwloss(constC, hC1, hC2, T, method_type=None, loss_fun=None, source_integrator=None, target_integrator=None):
 
     """Return the Loss for Gromov-Wasserstein
     The loss is computed as described in Proposition 1 Eq. (6) in [1].
