@@ -207,6 +207,8 @@ def cg(
     C1=None,
     C2=None,
     constC=None,
+    alpha_min=0.0,
+    alpha_max=1.0,
 ):
     """
     Solve the general regularized OT problem with conditional gradient
@@ -311,6 +313,8 @@ def cg(
             reg=reg,
             Gc=Gc,
             M=M,
+            alpha_min=alpha_min,
+            alpha_max=alpha_max,
         )
 
         if alpha is None or np.isnan(alpha):
