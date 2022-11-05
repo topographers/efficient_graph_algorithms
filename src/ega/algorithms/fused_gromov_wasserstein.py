@@ -13,7 +13,9 @@ class StopError(Exception):
     pass
 
 
-def init_matrix(C1, C2, p, q, loss_fun="square_loss"):
+def init_matrix(
+    C1, C2, p, q, loss_fun="square_loss", method_type=None, target_integrator=None
+):
     """Return loss matrices and tensors for Gromov-Wasserstein fast computation
     Returns the value of \mathcal{L}(C1,C2) \otimes T with the selected loss
     function as the loss function of Gromow-Wasserstein discrepancy.
@@ -37,6 +39,8 @@ def init_matrix(C1, C2, p, q, loss_fun="square_loss"):
     T :  ndarray, shape (ns, nt)
          Coupling between source and target spaces
     p : ndarray, shape (ns,)
+    method_type : str fast if None defaults to brute force
+    target_integrator : Callable , fast graph field integrator
     Returns
     -------
     constC : ndarray, shape (ns, nt)
@@ -81,6 +85,17 @@ def init_matrix(C1, C2, p, q, loss_fun="square_loss"):
             return np.log(b + 1e-15)
 
     constC1 = np.dot(np.dot(f1(C1), p.reshape(-1, 1)), np.ones(len(q)).reshape(1, -1))
+    if (method_type is None) or (loss_fun == "square_loss"):
+        constC2 = np.dot(
+            np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T)
+        )
+    elif (method_type is not None) and (loss_fun == "kl_loss"):
+        constC2_partial = (
+            target_integrator.integrate_graph_field(q.reshape(1, -1).T)
+        ).T
+        constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), constC2_partial)
+    else:
+        raise ValueError("Unsupported combination of loss and methods")
     constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T))
     constC = constC1 + constC2
     hC1 = h1(C1)
@@ -169,6 +184,10 @@ def gwloss(
            h2(C) matrix in Eq. (6)
     T : ndarray, shape (ns, nt)
            Current value of transport matrix T
+    Optional :
+    method_type : str None defaults to brute force
+    source_integrator : Callable function that does fast matrix multplication for source graph
+    target_integrator : Callable function that does fast matrix multplication for target graph
     Returns
     -------
     loss : float
@@ -216,6 +235,10 @@ def gwggrad(
            h2(C) matrix in Eq. (6)
     T : ndarray, shape (ns, nt)
            Current value of transport matrix T
+    Optional :
+    method_type : str None defaults to brute force
+    source_integrator : Callable function that does fast matrix multplication for source graph
+    target_integrator : Callable function that does fast matrix multplication for target graph
     Returns
     -------
     grad : ndarray, shape (ns, nt)
