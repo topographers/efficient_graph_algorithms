@@ -385,7 +385,7 @@ def gromov_wasserstein_discrepancy(
             )
             dfgf_t_integrator = None
     # calculate invariant cost matrix
-    cost_st = node_cost_st_as(
+    cost_st = node_cost_st(
         cost_s,
         cost_t,
         p_s,
