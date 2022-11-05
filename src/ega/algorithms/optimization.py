@@ -106,7 +106,7 @@ def do_linesearch(
     deltaG,
     Mi,
     f_val,
-    amijo=True,
+    armijo=True,
     C1=None,
     C2=None,
     reg=None,
@@ -134,21 +134,21 @@ def do_linesearch(
         Cost matrix of the linearized transport problem. Corresponds to the gradient of the cost
     f_val :  float
         Value of the cost at G
-    amijo : bool, optionnal
-            If True the steps of the line-search is found via an amijo research. Else closed form is used.
+    armijo : bool, optionnal
+            If True the steps of the line-search is found via an armijo research. Else closed form is used.
             If there is convergence issues use False.
     C1 : ndarray (ns,ns), optionnal
-        Structure matrix in the source domain. Only used when amijo=False
+        Structure matrix in the source domain. Only used when armijo=False
     C2 : ndarray (nt,nt), optionnal
-        Structure matrix in the target domain. Only used when amijo=False
+        Structure matrix in the target domain. Only used when armijo=False
     reg : float, optionnal
-          Regularization parameter. Corresponds to the alpha parameter of FGW. Only used when amijo=False
+          Regularization parameter. Corresponds to the alpha parameter of FGW. Only used when armijo=False
     Gc : ndarray (ns,nt)
-        Optimal map found by linearization in the FW algorithm. Only used when amijo=False
+        Optimal map found by linearization in the FW algorithm. Only used when armijo=False
     constC : ndarray (ns,nt)
-             Constant for the gromov cost. See [3]. Only used when amijo=False
+             Constant for the gromov cost. See [3]. Only used when armijo=False
     M : ndarray (ns,nt), optional
-        Cost matrix between the features. Only used when amijo=False,
+        Cost matrix between the features. Only used when armijo=False,
     Optional:
     method_type : str None defaults to brute force
     source_integrator : Callable function that does fast matrix multplication for source graph
@@ -167,7 +167,7 @@ def do_linesearch(
         "Optimal Transport for structured data with application on graphs"
         International Conference on Machine Learning (ICML). 2019.
     """
-    if amijo:
+    if armijo:
         alpha, fc, f_val = line_search_armijo(
             cost, G, deltaG, Mi, f_val, alpha_min=alpha_min, alpha_max=alpha_max
         )
@@ -223,7 +223,7 @@ def cg(
     stopThr2=1e-9,
     verbose=False,
     log=False,
-    amijo=True,
+    armijo=True,
     C1=None,
     C2=None,
     constC=None,
@@ -333,7 +333,7 @@ def cg(
             deltaG=deltaG,
             Mi=Mi,
             f_val=f_val,
-            amijo=amijo,
+            armijo=armijo,
             constC=constC,
             C1=C1,
             C2=C2,

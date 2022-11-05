@@ -89,7 +89,16 @@ def init_matrix(C1, C2, p, q, loss_fun="square_loss"):
     return constC, hC1, hC2
 
 
-def tensor_product(constC, hC1, hC2, T, method_type=None, loss_fun=None, source_integrator=None, target_integrator=None):
+def tensor_product(
+    constC,
+    hC1,
+    hC2,
+    T,
+    method_type=None,
+    loss_fun=None,
+    source_integrator=None,
+    target_integrator=None,
+):
 
     """Return the tensor for Gromov-Wasserstein fast computation
     The tensor is computed as described in Proposition 1 Eq. (6) in [1].
@@ -102,7 +111,7 @@ def tensor_product(constC, hC1, hC2, T, method_type=None, loss_fun=None, source_
     hC2 : ndarray, shape (nt, nt)
            h2(C) matrix in Eq. (6)
     T : ndarray shape (ns,nt) coupling matrix between source and target
-    Optional : 
+    Optional :
     method_type : str None defaults to brute force
     source_integrator : Callable function that does fast matrix multplication for source graph
     target_integrator : Callable function that does fast matrix multplication for target graph
@@ -117,25 +126,36 @@ def tensor_product(constC, hC1, hC2, T, method_type=None, loss_fun=None, source_
     International Conference on Machine Learning (ICML). 2016.
     """
 
-    if method_type is None: 
+    if method_type is None:
         A = -np.dot(np.dot(hC1, T), hC2.T)
-    else: 
-        if loss_fun =='square_loss':
-            partial_prod =  source_integrator.integrate_graph_field(T)
-            A = -2*(target_integrator.integrate_graph_field(partial_prod.T)).T
+    else:
+        if loss_fun == "square_loss":
+            partial_prod = source_integrator.integrate_graph_field(T)
+            A = -2 * (target_integrator.integrate_graph_field(partial_prod.T)).T
             del partial_prod
-        elif loss_fun == 'kl_loss':
-            partial_prod =  source_integrator.integrate_graph_field(T)
+        elif loss_fun == "kl_loss":
+            partial_prod = source_integrator.integrate_graph_field(T)
             A = -np.dot(partial_prod, hC2.T)
             del partial_prod
-        else :
-            raise NotImplementedError("Other types of losses are not currently supported.")
+        else:
+            raise NotImplementedError(
+                "Other types of losses are not currently supported."
+            )
     tens = constC + A
 
     return tens
 
 
-def gwloss(constC, hC1, hC2, T, method_type=None, loss_fun=None, source_integrator=None, target_integrator=None):
+def gwloss(
+    constC,
+    hC1,
+    hC2,
+    T,
+    method_type=None,
+    loss_fun=None,
+    source_integrator=None,
+    target_integrator=None,
+):
 
     """Return the Loss for Gromov-Wasserstein
     The loss is computed as described in Proposition 1 Eq. (6) in [1].
@@ -160,12 +180,29 @@ def gwloss(constC, hC1, hC2, T, method_type=None, loss_fun=None, source_integrat
     International Conference on Machine Learning (ICML). 2016.
     """
 
-    tens = tensor_product(constC, hC1, hC2, T)
-
+    tens = tensor_product(
+        constC,
+        hC1,
+        hC2,
+        T,
+        method_type=method_type,
+        loss_fun=loss_fun,
+        source_integrator=source_integrator,
+        target_integrator=target_integrator,
+    )
     return np.sum(tens * T)
 
 
-def gwggrad(constC, hC1, hC2, T):
+def gwggrad(
+    constC,
+    hC1,
+    hC2,
+    T,
+    method_type=None,
+    loss_fun=None,
+    source_integrator=None,
+    target_integrator=None,
+):
 
     """Return the gradient for Gromov-Wasserstein
     The gradient is computed as described in Proposition 2 in [1].
@@ -190,7 +227,16 @@ def gwggrad(constC, hC1, hC2, T):
     International Conference on Machine Learning (ICML). 2016.
     """
 
-    return 2 * tensor_product(constC, hC1, hC2, T)
+    return 2 * tensor_product(
+        constC,
+        hC1,
+        hC2,
+        T,
+        method_type=method_type,
+        loss_fun=loss_fun,
+        source_integrator=source_integrator,
+        target_integrator=target_integrator,
+    )
 
 
 def gw_lp(
@@ -200,10 +246,19 @@ def gw_lp(
     q,
     loss_fun="square_loss",
     alpha=1,
-    amijo=True,
+    armijo=True,
     G0=None,
-    log=False,
-    **kwargs
+    log=True,
+    method_type=None,
+    source_positions=None,
+    target_positions: np.ndarray = None,
+    source_epsilon: float = None,
+    target_epsilon: float = None,
+    source_lambda_par: float = None,
+    target_lambda_par: float = None,
+    num_rand_features: int = None,
+    dim: int = None,
+    verbose=False,
 ):
 
     """
@@ -238,14 +293,24 @@ def gw_lp(
         Print information along iterations
     log : bool, optional
         record log if True
-    amijo : bool, optional
-        If True the step of the line-search is found via an amijo research. Else closed form is used.
+    armijo : bool, optional
+        If True the step of the line-search is found via an armijo research. Else closed form is used.
         If there is convergence issues use False.
      G0: ndarray, shape (ns,nt), optional
         If None the initial transport plan of the solver is pq^T.
         Otherwise G0 must satisfy marginal constraints and will be used as initial transport of the solver.
-    **kwargs : dict
-        parameters can be directly pased to the ot.optim.cg solver
+    The rest of the parameters are optional and only used for fast matrix vector multiplication.
+        method_type : Anything other than None defaults to fast matrix vector multiplication
+        source_positions : (n_s, dim) location of points in d-dim Euclidean space.
+        target_positions : (n_t, dim) location of points in d-dim Euclidean space.
+        source_epsilon : parameter that controls the epsilon neighbor of source points
+        target_epsilon : parameter that controls the epsilon neighbor of target points
+        source_lambda_par : diffusion parameter for source graph.
+        target_lambda_par : diffusion parameter for target graph.
+        num_rand_features : Number of random features
+        dim : Input dimensionality of the data
+    verbose : bool, optional
+        If true returns logs/errors in each iteration
     Returns
     -------
     T : ndarray, shape (ns, nt)
@@ -263,7 +328,52 @@ def gw_lp(
         mathematics 11.4 (2011): 417-487.
     """
 
-    constC, hC1, hC2 = init_matrix(C1, C2, p, q, loss_fun)
+    if method_type is not None:
+        dfgf_s_integrator = DFGFIntegrator(
+            source_positions,
+            source_epsilon,
+            source_lambda_par,
+            num_rand_features,
+            dim,
+            random_projection_creator,
+            density_function,
+            fourier_transform,
+        )
+        dfgf_t_integrator = DFGFIntegrator(
+            target_positions,
+            target_epsilon,
+            target_lambda_par,
+            num_rand_features,
+            dim,
+            random_projection_creator,
+            density_function,
+            fourier_transform,
+        )
+        if loss_fun == "square_loss":
+            constC, _, _ = init_matrix(
+                C1, C2, p, q, loss_fun, method_type=method_type, target_integrator=None
+            )
+            hC1, hC2 = None, None
+        elif loss_fun == "kl_loss":
+            constC, _, hC2 = init_matrix(
+                C1,
+                C2,
+                p,
+                q,
+                loss_fun,
+                method_type=method_type,
+                target_integrator=dfgf_t_integrator,
+            )
+            hC1 = None
+        else:
+            raise ValueError("incorrect loss function used")
+    else:
+        dfgf_s_integrator = None
+        dfgf_t_integrator = None
+        constC, hC1, hC2 = init_matrix(
+            C1, C2, p, q, loss_fun, method_type=method_type, target_integrator=None
+        )
+
     M = np.zeros((C1.shape[0], C2.shape[0]))
 
     if G0 is None:
@@ -273,53 +383,87 @@ def gw_lp(
         np.testing.assert_allclose(G0.sum(axis=0), q, atol=1e-08)
 
     def f(G):
-        return gwloss(constC, hC1, hC2, G)
+        return gwloss(
+            constC,
+            hC1,
+            hC2,
+            G,
+            method_type=method_type,
+            loss_fun=loss_fun,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+        )
 
     def df(G):
-        return gwggrad(constC, hC1, hC2, G)
+        return gwggrad(
+            constC,
+            hC1,
+            hC2,
+            G,
+            method_type=method_type,
+            loss_fun=loss_fun,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+        )
 
-    # TODO: TEST THIS VALUE AGAINST POT
     if log:
         res, log0 = optimization.cg(
             a=p,
             b=q,
             M=M,
-            alpha=alpha,
+            reg=alpha,
             f=f,
             df=df,
             G0=G0,
-            amijo=amijo,
+            armijo=armijo,
             C1=C1,
             C2=C2,
             constC=constC,
             log=log,
             alpha_min=0,
             alpha_max=1,
+            method_type=method_type,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+            verbose=verbose,
         )
-        log0["gw_dist"] = gwloss(constC, hC1, hC2, res)
+        log0["gw_dist"] = gwloss(
+            constC,
+            hC1,
+            hC2,
+            res,
+            method_type=method_type,
+            loss_fun=loss_fun,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+        )
         return res, log0
     else:
         res = optimization.cg(
             a=p,
             b=q,
             M=M,
-            alpha=alpha,
+            reg=alpha,
             f=f,
             df=df,
             G0=G0,
-            amijo=amijo,
+            armijo=armijo,
             C1=C1,
             C2=C2,
             constC=constC,
             log=log,
             alpha_min=0,
             alpha_max=1,
+            method_type=method_type,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+            verbose=verbose,
         )
         return res
 
 
 def fgw_lp(
-    M, C1, C2, p, q, loss_fun="square_loss", alpha=0.5, amijo=True, G0=None, **kwargs
+    M, C1, C2, p, q, loss_fun="square_loss", alpha=0.5, armijo=True, G0=None, **kwargs
 ):
     """
     Computes the FGW distance between two graphs see [3]
@@ -355,8 +499,8 @@ def fgw_lp(
         Print information along iterations
     log : bool, optional
         record log if True
-    amijo : bool, optional
-        If True the steps of the line-search is found via an amijo research. Else closed form is used.
+    armijo : bool, optional
+        If True the steps of the line-search is found via an armijo research. Else closed form is used.
         If there is convergence issues use False.
     **kwargs : dict
         parameters can be directly pased to the ot.optim.cg solver
@@ -396,7 +540,7 @@ def fgw_lp(
         f,
         df,
         G0,
-        amijo=amijo,
+        armijo=armijo,
         C1=C1,
         C2=C2,
         constC=constC,
