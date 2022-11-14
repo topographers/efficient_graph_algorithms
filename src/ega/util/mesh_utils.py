@@ -1,17 +1,17 @@
-
-import trimesh 
-import numpy as np 
+import trimesh
+import numpy as np
 import scipy
 from scipy import linalg
 from typing import List, Callable
-import networkx as nx 
+import networkx as nx
+
 
 def random_circular_rotation(adjacency_lists: List[List[int]], seed: int) -> List[List[int]]:
     """ this function randomly shuffles the adjacency list """
     np.random.seed(seed)
     for index in range(len(adjacency_lists)):
         shift = np.random.randint(low=0, high=len(adjacency_lists[index]))
-        rotated_adjacency_list = np.roll(np.array(adjacency_lists[index]), 
+        rotated_adjacency_list = np.roll(np.array(adjacency_lists[index]),
                                          shift=shift).tolist()
         adjacency_lists[index] = rotated_adjacency_list
     return adjacency_lists
@@ -26,9 +26,7 @@ def neighbors_in_cyclic_order(face: List[int], vertex_index: int) -> List[int]:
         return [v2, v3]
     if v2 == vertex_index:
         return [v3, v1]
-    return [v1, v2]    
-
-
+    return [v1, v2]
 
 
 def trimesh_to_adjacency_matrices(mesh, seed=0):
@@ -37,9 +35,9 @@ def trimesh_to_adjacency_matrices(mesh, seed=0):
     faces = mesh.faces
     faces_adj_to_vertices = []
     adjacency_lists = []
-    for _  in range(len(vertices)):
-        faces_adj_to_vertices.append([])  
-        adjacency_lists.append([])  
+    for _ in range(len(vertices)):
+        faces_adj_to_vertices.append([])
+        adjacency_lists.append([])
     for index in range(len(faces)):
         v1, v2, v3 = faces[index]
         faces_adj_to_vertices[v1].append(index)
@@ -59,9 +57,9 @@ def trimesh_to_adjacency_matrices(mesh, seed=0):
         while True:
             mesh_edge_reached = False
             vertex_adjacency_list.append(next_vertex)
-            if not next_vertex in edge_dict:
+            if next_vertex not in edge_dict:
                 mesh_edge_reached = True
-            else:  
+            else:
                 next_vertex = edge_dict[next_vertex]
             if next_vertex == first_vertex and not mesh_edge_reached:
                 break
@@ -70,15 +68,13 @@ def trimesh_to_adjacency_matrices(mesh, seed=0):
                 while True:
                     vertex_adjacency_list.append(next_vertex)
                     if next_vertex in rev_edge_dict:
-                        next_vertex = rev_edge_dict[next_vertex] 
+                        next_vertex = rev_edge_dict[next_vertex]
                     else:
-                        break  
-                vertex_adjacency_list.reverse() 
+                        break
+                vertex_adjacency_list.reverse()
                 break
         adjacency_lists[index] = vertex_adjacency_list
     return random_circular_rotation(adjacency_lists, seed)
-
-
 
 
 def adjacency_list_to_sparse_matrix(adjacency_lists: List[List[int]]):
@@ -94,8 +90,9 @@ def adjacency_list_to_sparse_matrix(adjacency_lists: List[List[int]]):
     n_vertices = row_idx_list[-1] + 1
     V = [1] * len(row_idx_list)
 
-    sparse_adjacency_matrix = scipy.sparse.coo_matrix((V,(row_idx_list,rwo_content_list)),shape=(n_vertices,n_vertices))
-    return sparse_adjacency_matrix  
+    sparse_adjacency_matrix = scipy.sparse.coo_matrix((V, (row_idx_list, rwo_content_list)),
+                                                      shape=(n_vertices, n_vertices))
+    return sparse_adjacency_matrix
 
 
 def generate_weights_from_adjacency_list(adjacency_lists: List[List[int]]) -> List[List[int]]:
@@ -120,10 +117,10 @@ def calculate_interpolation_metrics(true_fields: np.ndarray, interpolated_fields
     true_fields and interpolated_fields: both should have dimension of N by d, with N represents number of nodes, 
                                          and d represents the dimension of graph field features.
     """
-    
-    frobenius_norm = np.linalg.norm(true_fields - interpolated_fields, ord = 'fro')
-    cosine_similarity = np.mean((true_fields*interpolated_fields).sum(axis = -1) / \
-        np.linalg.norm(true_fields, axis = -1) / np.linalg.norm(interpolated_fields, axis = -1))
+
+    frobenius_norm = np.linalg.norm(true_fields - interpolated_fields, ord='fro')
+    cosine_similarity = np.mean((true_fields * interpolated_fields).sum(axis=-1) / \
+                                np.linalg.norm(true_fields, axis=-1) / np.linalg.norm(interpolated_fields, axis=-1))
     print("Frobenious Norm: {}\nCosine Similarity: {}".format(frobenius_norm, cosine_similarity))
 
 
@@ -136,12 +133,12 @@ def density_function(input_projection: np.ndarray) -> np.ndarray:
     """
     dim = len(input_projection)
     length = linalg.norm(input_projection)
-    return (1.0 / np.power(2.0 * np.pi, dim / 2.0)) * np.exp(-length**2 / 2.0)
+    return (1.0 / np.power(2.0 * np.pi, dim / 2.0)) * np.exp(-length ** 2 / 2.0)
 
 
-def random_projection_creator(num_random_features: int, 
-                              dim: int, 
-                              scaling=0, 
+def random_projection_creator(num_random_features: int,
+                              dim: int,
+                              scaling=0,
                               ortho=True) -> np.ndarray:
     """
     this is a function  N * N -> R ^ {N * N}  that constructs random projections 
@@ -177,7 +174,7 @@ def random_projection_creator(num_random_features: int,
     if scaling == 0:
         multiplier = np.linalg.norm(np.random.normal(size=(num_random_features, dim)), axis=1)
     elif scaling == 1:
-        multiplier = np.sqrt(float(dim)) * np.ones((num_random_features))
+        multiplier = np.sqrt(float(dim)) * np.ones(num_random_features)
     else:
         raise ValueError('Scaling must be one of {0, 1}. Was %s' % scaling)
 
@@ -189,18 +186,18 @@ def fourier_transform(input_projection: np.ndarray, epsilon: float, norm_type='L
     Fourier Transform of the function defining edges between graph nodes.
     """
     if norm_type == 'L1':
-        return np.prod(np.sin(2.0 * epsilon* input_projection) / input_projection)
+        return np.prod(np.sin(2.0 * epsilon * input_projection) / input_projection)
     elif norm_type == 'L2':
         pass
     else:
-        pass 
+        pass
 
 
-def construct_random_features(positions: np.ndarray, 
-                              random_projection_creator: Callable, 
-                              density_function: Callable, 
-                              num_rand_features: int, 
-                              fourier_transform: Callable, 
+def construct_random_features(positions: np.ndarray,
+                              random_projection_creator: Callable,
+                              density_function: Callable,
+                              num_rand_features: int,
+                              fourier_transform: Callable,
                               epsilon: float):
     """
     this function is used by graph diffusion GFIntegrator
@@ -215,8 +212,5 @@ def construct_random_features(positions: np.ndarray,
     fts = np.apply_along_axis(ft_with_eps, 1, projection_matrix)
     dens = np.apply_along_axis(density_function, 1, projection_matrix)
     renormalizers = fts / dens
-    rfs = np.einsum('nm,m->nm',exp_projected_positions, renormalizers)
+    rfs = np.einsum('nm,m->nm', exp_projected_positions, renormalizers)
     return (1.0 / np.sqrt(num_rand_features)) * rfs
-
-
-

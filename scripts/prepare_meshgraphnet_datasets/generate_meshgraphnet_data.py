@@ -20,16 +20,16 @@ This file generates mesh graphs from the dataset used in paper: https://arxiv.or
 Most of the code here are refactorized from the pytorch implementation of this paper here: https://github.com/wwMark/meshgraphnets
 """
 
-import argparse 
-import os 
+import argparse
+import os
 from tfrecord.torch.dataset import TFRecordDataset
 from torch.utils.data import IterableDataset, DataLoader
-import torch 
+import torch
 import enum
-import json 
-import numpy as np 
+import json
+import numpy as np
 import torch.nn.functional as F
-import collections 
+import collections
 import trimesh
 import pickle
 from typing import List, Callable
@@ -40,19 +40,20 @@ from ega.util.mesh_utils import neighbors_in_cyclic_order, random_circular_rotat
 
 def get_args_parser():
     parser = argparse.ArgumentParser('GraphMeshNet', add_help=False)
-    
+
     parser.add_argument('--model', default='cloth', type=str,
-        choices = ['cloth', 'deform'], help='Select model to run.')
+                        choices=['cloth', 'deform'], help='Select model to run.')
     parser.add_argument('--rollout_split', default='valid', type=str,
-        choices =  ['train', 'test', 'valid'], help='Which dataset split to use for rollouts.')
+                        choices=['train', 'test', 'valid'], help='Which dataset split to use for rollouts.')
     parser.add_argument('--dataset', default='flag_simple', type=str,
-        choices =  ['flag_simple', 'deforming_plate'])    
-    parser.add_argument('--trajectories', type = int, default = 5, help = 'No. of training trajectories')
-    parser.add_argument('--snapshot_frequency', type = int, default = 20, help = 'frequency to get snapshots for meshgraph data per trajectory')
+                        choices=['flag_simple', 'deforming_plate'])
+    parser.add_argument('--trajectories', type=int, default=5, help='No. of training trajectories')
+    parser.add_argument('--snapshot_frequency', type=int, default=20,
+                        help='frequency to get snapshots for meshgraph data per trajectory')
     parser.add_argument('--device', default='cpu', type=str,
-        choices =  ['cpu', 'cuda'], help='use default cuda or cpu')
-    
-    return parser 
+                        choices=['cpu', 'cuda'], help='use default cuda or cpu')
+
+    return parser
 
 
 class NodeType(enum.IntEnum):
@@ -82,6 +83,7 @@ class FlagSimpleDatasetIterative(IterableDataset):
     """
     Iterable dataset to reduce main memory usage, no multiprocessing
     """
+
     def __init__(self, path, split, add_targets=False, split_and_preprocess=False):
         self.path = path
         self.split = split
@@ -126,7 +128,7 @@ class FlagSimpleDatasetIterative(IterableDataset):
         noise_field = 'world_pos'
         noise_scale = 0.003
         noise_gamma = 0.1
-        device = args.device 
+        device = args.device
 
         def add_noise(frame):
             zero_size = torch.zeros(frame[noise_field].size(), dtype=torch.float32).to(device)
@@ -165,9 +167,10 @@ class FlagSimpleDatasetIterative(IterableDataset):
 
 def load_dataset(path, split, add_targets=False, split_and_preprocess=False, batch_size=1, prefetch_factor=2):
     """ this function returns a torch dataloader """
-    return DataLoader(FlagSimpleDatasetIterative(path=path, split=split, add_targets=add_targets, 
-          split_and_preprocess=split_and_preprocess), batch_size=batch_size, prefetch_factor=prefetch_factor, 
-          shuffle=False, num_workers=0)
+    return DataLoader(FlagSimpleDatasetIterative(path=path, split=split, add_targets=add_targets,
+                                                 split_and_preprocess=split_and_preprocess), batch_size=batch_size,
+                      prefetch_factor=prefetch_factor,
+                      shuffle=False, num_workers=0)
 
 
 def triangles_to_edges(faces, deform=False):
@@ -213,7 +216,7 @@ def triangles_to_edges(faces, deform=False):
 
         two_way_connectivity = (torch.cat((senders, receivers), dim=0), torch.cat((receivers, senders), dim=0))
         return {'two_way_connectivity': two_way_connectivity, 'senders': senders, 'receivers': receivers}
-    
+
 
 def add_targets(params):
     """Adds target and optionally history fields to dataframe."""
@@ -240,6 +243,7 @@ def add_targets(params):
                         out['prev|' + key] = val[0:-2]
                     out['target|' + key] = val[2:]
             return out
+
     return fn
 
 
@@ -282,10 +286,14 @@ def squeeze_data_frame(data_frame):
     return data_frame
 
 
-def process_trajectory(trajectory_data, params, model_type, dataset_dir, add_targets_bool=False,
-                       split_and_preprocess_bool=False):
-    global steps
-
+def process_trajectory(
+        trajectory_data,
+        params,
+        model_type,
+        dataset_dir,
+        add_targets_bool: bool = False,
+        split_and_preprocess_bool: bool = False,
+):
     try:
         with open(os.path.join(dataset_dir, 'meta.json'), 'r') as fp:
             meta = json.loads(fp.read())
@@ -299,7 +307,7 @@ def process_trajectory(trajectory_data, params, model_type, dataset_dir, add_tar
             types[key] = field['type']
     except FileNotFoundError as e:
         print(e)
-        quit()
+        exit()
     trajectory = {}
     # decode bytes into corresponding dtypes
     for key, value in trajectory_data.items():
@@ -322,9 +330,7 @@ def process_trajectory(trajectory_data, params, model_type, dataset_dir, add_tar
     return trajectory
 
 
-
-
-def faces_to_adjacency_matrices(faces: np.ndarray, nb_nodes: int, seed = 0) -> List[List[int]]:
+def faces_to_adjacency_matrices(faces: np.ndarray, nb_nodes: int, seed=0) -> List[List[int]]:
     """
     this function is heavily built on the original trimesh_to_adjacency_matrices, 
     the only difference is that the input here replaces trimesh into faces, which is a 2d array of size N by 3.
@@ -333,16 +339,16 @@ def faces_to_adjacency_matrices(faces: np.ndarray, nb_nodes: int, seed = 0) -> L
     vertices = list(range(nb_nodes))
     faces_adj_to_vertices = []
     adjacency_lists = []
-    for _  in range(len(vertices)):
-        faces_adj_to_vertices.append([])  
-        adjacency_lists.append([])  
+    for _ in range(len(vertices)):
+        faces_adj_to_vertices.append([])
+        adjacency_lists.append([])
     for index in range(len(faces)):
         v1, v2, v3 = faces[index]
         faces_adj_to_vertices[v1].append(index)
         faces_adj_to_vertices[v2].append(index)
         faces_adj_to_vertices[v3].append(index)
     for index in range(len(faces_adj_to_vertices)):
-        #print(index)
+        # print(index)
         vertex_adjacency_list = []
         edge_dict = dict()
         rev_edge_dict = dict()
@@ -356,7 +362,7 @@ def faces_to_adjacency_matrices(faces: np.ndarray, nb_nodes: int, seed = 0) -> L
         while True:
             mesh_edge_reached = False
             vertex_adjacency_list.append(next_vertex)
-            if not next_vertex in edge_dict:
+            if next_vertex not in edge_dict:
                 mesh_edge_reached = True
             else:
                 next_vertex = edge_dict[next_vertex]
@@ -367,14 +373,13 @@ def faces_to_adjacency_matrices(faces: np.ndarray, nb_nodes: int, seed = 0) -> L
                 while True:
                     vertex_adjacency_list.append(next_vertex)
                     if next_vertex in rev_edge_dict:
-                        next_vertex = rev_edge_dict[next_vertex] 
+                        next_vertex = rev_edge_dict[next_vertex]
                     else:
-                        break  
-                vertex_adjacency_list.reverse() 
-                break 
+                        break
+                vertex_adjacency_list.reverse()
+                break
         adjacency_lists[index] = vertex_adjacency_list
     return random_circular_rotation(adjacency_lists, seed)
-
 
 
 def build_graph(inputs):
@@ -388,68 +393,65 @@ def build_graph(inputs):
     velocity = world_pos - prev_world_pos
     one_hot_node_type = F.one_hot(node_type[:, 0].to(torch.int64), NodeType.SIZE)
     node_features = torch.cat((velocity, one_hot_node_type), dim=-1)
-    node_features = np.array(node_features) # we use numpy in this version. 
+    node_features = np.array(node_features)  # we use numpy in this version.
     cells = inputs['cells']
-    
+
     n_nodes = len(node_features)
     vertices = list(range(n_nodes))
     adjacency_list = faces_to_adjacency_matrices(cells.numpy(), n_nodes)
-    
 
     weight_list = [[] for i in range(n_nodes)]
     for i, neighbors_i in enumerate(adjacency_list):
         for nb in neighbors_i:
             dist = np.linalg.norm(world_pos[i] - world_pos[nb])
             weight_list[i].append(dist)
-    
+
     """
     # we use trimesh here to get the triangle edges list of each node. 
     # we can also use the following code for visualization 
     mesh = trimesh.Trimesh(vertices = np.array(world_pos), faces = np.array(cells), process = False)
     mesh.show()
     """
-    return {'adjacency_list':adjacency_list, 
-            'weight_list':weight_list, 
-            'node_features':node_features, 
-            'vertices':vertices,
-            'world_pos': np.array(world_pos), 
+    return {'adjacency_list': adjacency_list,
+            'weight_list': weight_list,
+            'node_features': node_features,
+            'vertices': vertices,
+            'world_pos': np.array(world_pos),
             'prev_world_pos': np.array(prev_world_pos),
             'faces': np.array(cells)}
 
 
 def main():
+    parser = argparse.ArgumentParser('GraphMeshNet', parents=[get_args_parser()])
+    args = parser.parse_args()
+
     dataset_dir = os.path.join(default_meshgraphnet_dataset_path, args.dataset)
     params = PARAMETERS[args.model]
-    
+
     ds_loader = load_dataset(dataset_dir, split=args.rollout_split, add_targets=True, split_and_preprocess=True)
     ds_iterator = iter(ds_loader)
 
     processed_path = os.path.join(default_meshgraphnet_dataset_path, args.dataset, 'processed_data')
     if not os.path.exists(processed_path):
         os.makedirs(processed_path)
-                
+
     for trajectory_index in range(args.trajectories):
-        
+
         trajectory = next(ds_iterator)
         trajectory = process_trajectory(trajectory, params, args.model, dataset_dir, True, True)
         meshgraph_list = []
-        
+
         for data_frame_index, data_frame in enumerate(trajectory):
             if data_frame_index % args.snapshot_frequency == 0:
                 data_frame = squeeze_data_frame(data_frame)
                 meshgraph = build_graph(data_frame)
                 meshgraph_list.append(meshgraph)
-            
+
         processed_file = os.path.join(processed_path, "trajectory_{}.pkl".format(trajectory_index))
-        with open (processed_file, 'wb') as f:
+        with open(processed_file, 'wb') as f:
             pickle.dump(meshgraph_list, f)
         print("trajectory {} saved".format(trajectory_index))
 
-    
-    
+
 if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser('GraphMeshNet', parents=[get_args_parser()])
-    args = parser.parse_args()
-
-    main() 
+    main()
