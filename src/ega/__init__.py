@@ -19,4 +19,6 @@ __all__ = [
     "evaluation",
     "algorithms",
     "util",
+    "default_meshgraphnet_dataset_path",
+    "default_trimesh_dataset_path",
 ]

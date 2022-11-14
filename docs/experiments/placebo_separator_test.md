@@ -3,5 +3,5 @@
 To run graph integration with placebo separator
 
 ```sh
-python scripts/experiments/placebo_separator_test.py 
+python scripts/experiments/test_placebo_separator.py 
 ```
