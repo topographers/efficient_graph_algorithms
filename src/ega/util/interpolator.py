@@ -16,13 +16,7 @@ class Interpolator():
         """
         self.integrator = integrator 
         self.vertices_known = vertices_known
-        self.vertices_interpolate = vertices_interpolate
-
-        # since we don't need to predict fields for known vertices, we mask these rows in _m_matrix as zeros 
-        # without this line of code, the method still works with the same result. 
-        # feel free to comment out this line if masking vertices_known in _m_matrtix is non-trivial in your integrator.
-        self.integrator._m_matrix[vertices_known] = 0 
-        
+        self.vertices_interpolate = vertices_interpolate        
         
     def interpolate(self, field: np.ndarray) -> np.ndarray:
         """ 

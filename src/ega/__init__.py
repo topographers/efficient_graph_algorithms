@@ -12,10 +12,13 @@ __current_path = os.path.dirname(__file__)
 default_curvox_dataset_path = os.path.abspath(os.path.join(__current_path, "../../", "data", "curvox_dataset"))
 default_meshgraphnet_dataset_path = os.path.abspath(os.path.join(__current_path, "../../", "data", "meshgraphnet_dataset"))
 default_training_path = os.path.abspath(os.path.join(__current_path, "../../", "data", "training"))
+default_trimesh_dataset_path = os.path.abspath(os.path.join(__current_path, "../../", "data", "trimesh"))
 root_path = os.path.dirname(os.path.realpath(__file__))
 
 __all__ = [
     "evaluation",
     "algorithms",
     "util",
+    "default_meshgraphnet_dataset_path",
+    "default_trimesh_dataset_path",
 ]
