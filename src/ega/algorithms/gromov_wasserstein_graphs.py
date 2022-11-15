@@ -16,6 +16,15 @@ from ega.util.mesh_utils import (
     fourier_transform,
 )
 
+def fast_multiply_matrix_square(integrator, field):
+    """
+    Fast mutiplication with Hadamard square of a matrix and a vector
+    Args : integrator : fast graph field integrator to
+    """
+  assert field.shape[1] == 1
+  partial_field = integrator.integrate_graph_field(np.diag(field.squeeze())).T
+  return np.diag(integrator.integrate_graph_field(partial_field)).reshape(-1,1)
+
 
 def node_distribution_similarity(
     p_s: np.ndarray, p_t: np.ndarray, values: list = None
