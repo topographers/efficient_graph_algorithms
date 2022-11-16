@@ -16,14 +16,15 @@ from ega.util.mesh_utils import (
     fourier_transform,
 )
 
+
 def fast_multiply_matrix_square(integrator, field):
     """
     Fast mutiplication with Hadamard square of a matrix and a vector
-    Args : integrator : fast graph field integrator to
+    Args : integrator : fast graph field integrator to compute einsum with a vector
     """
-  assert field.shape[1] == 1
-  partial_field = integrator.integrate_graph_field(np.diag(field.squeeze())).T
-  return np.diag(integrator.integrate_graph_field(partial_field)).reshape(-1,1)
+    assert field.shape[1] == 1
+    partial_field = integrator.integrate_graph_field(np.diag(field.squeeze())).T
+    return np.diag(integrator.integrate_graph_field(partial_field)).reshape(-1, 1)
 
 
 def node_distribution_similarity(
@@ -170,6 +171,8 @@ def node_cost_st(
     loss_type: str = "L2",
     prior: float = None,
     method_type: str = None,
+    source_integrator: Callable = None,
+    target_integrator: Callable = None,
 ) -> np.ndarray:
     """
     Calculate invariant cost between the nodes in different graphs based on learned optimal transport
@@ -181,7 +184,9 @@ def node_cost_st(
         loss_type: 'L2' the Euclidean loss type for Gromov-Wasserstein discrepancy
                    'KL' the KL-divergence loss type for Gromov-Wasserstein discrepancy
         prior: whether use node distribution similarity matrix as a prior
-        method_type: whether to use fast matrix multiplication
+         method_type: Any string now defaults to graph diffusion fast matrix multiplication
+        source_integrator : Graph field integrator on source graph
+        target_integrator : Graph field integrator on target graph
 
     Returns:
         cost_st: (n_s, n_t) array, the estimated invariant cost between the nodes in two graphs
@@ -200,9 +205,22 @@ def node_cost_st(
             f2_st = np.repeat((cost_t @ p_t).T, n_s, axis=0)
 
     else:
-        raise ValueError(
-            "Invariant cost is not supported by fast matrix multiplication methods as it needs to materializes the matrices first"
-        )
+        n_s = p_s.shape[0]
+        n_t = p_t.shape[0]
+        if loss_type == "L2":
+            f1_st = np.repeat(
+                fast_multiply_matrix_square(source_integrator, p_s), n_t, axis=1
+            )
+            f2_st = np.repeat(
+                fast_multiply_matrix_square(target_integrator, p_t).T, n_s, axis=0
+            )
+        else:
+            f1_st = np.repeat(
+                np.matmul(cost_s * np.log(cost_s + 1e-15) - cost_s, p_s), n_t, axis=1
+            )  # so far do not know of an easy to make it faster
+            f2_st = np.repeat(
+                (target_integrator.integrate_graph_field(p_t)).T, n_s, axis=0
+            )
 
     cost_st = f1_st + f2_st
     if prior is not None:
@@ -257,44 +275,6 @@ def node_cost(
             cost_partial = source_integrator.integrate_graph_field(trans)
             cost = cost_st - np.matmul(cost_partial, (np.log(cost_t + 1e-15)).T)
     return cost
-
-
-##TODO:TRY TO INJECT FAST MATRIX MULTIPLICATION
-def gromov_wasserstein_average(
-    transports: Dict, costs: Dict, p_center: np.ndarray, weights: Dict, loss_type: str
-) -> np.ndarray:
-    """
-    Averaging of cost matrix
-
-    Args:
-        transports: a dictionary, whose keys are graph ids and values are (n_s, n_c) np.ndarray of optimal transports
-        costs: a dictionary, whose keys are graph ids and values are (n_s, n_s) np.ndarray of cost matrices
-        p_center: (n_c, 1) np.ndarray of barycenter's distribution
-        weights: a dictionary, whose keys are graph ids and values are float number of weight
-        loss_type: 'L2' the Euclidean loss type for Gromov-Wasserstein discrepancy
-                   'KL' the KL-divergence loss type for Gromov-Wasserstein discrepancy
-
-    Returns:
-        barycenter: (N, N) np.ndarray, the barycenter of cost matrix
-    """
-    barycenter = 0
-    if loss_type == "L2":
-        for n in costs.keys():
-            cost = costs[n]
-            trans = transports[n]
-            # barycenter += weights[n] * np.matmul(np.matmul(trans.T, cost), trans)
-            barycenter += weights[n] * (trans.T @ (cost @ trans))
-        barycenter /= np.matmul(p_center, p_center.T)
-    else:
-        for n in costs.keys():
-            cost = costs[n]
-            trans = transports[n]
-            barycenter += weights[n] * np.matmul(
-                np.matmul(trans.T, np.log(cost + 1e-15)), trans
-            )
-        barycenter /= np.matmul(p_center, p_center.T)
-        barycenter = np.exp(barycenter)
-    return barycenter
 
 
 def gromov_wasserstein_discrepancy(
@@ -393,6 +373,8 @@ def gromov_wasserstein_discrepancy(
                 fourier_transform,
             )
             dfgf_t_integrator = None
+    else:
+        dfgf_s_integrator, dfgf_t_integrator = None, None
     # calculate invariant cost matrix
     cost_st = node_cost_st(
         cost_s,
@@ -401,7 +383,9 @@ def gromov_wasserstein_discrepancy(
         p_t,
         loss_type=ot_hyperpara["loss_type"],
         prior=ot_hyperpara["node_prior"],
-        method_type=None,
+        method_type=method_type,
+        source_integrator=dfgf_s_integrator,
+        target_integrator=dfgf_t_integrator,
     )
     while (
         relative_error > ot_hyperpara["iter_bound"]
@@ -490,7 +474,42 @@ def gromov_wasserstein_discrepancy(
     return trans0, d_gw, p_s
 
 
-## TODO: inject the fast variant
+## TODO: inject the fast variants
+def gromov_wasserstein_average(
+    transports: Dict, costs: Dict, p_center: np.ndarray, weights: Dict, loss_type: str
+) -> np.ndarray:
+    """
+    Averaging of cost matrix
+    Args:
+        transports: a dictionary, whose keys are graph ids and values are (n_s, n_c) np.ndarray of optimal transports
+        costs: a dictionary, whose keys are graph ids and values are (n_s, n_s) np.ndarray of cost matrices
+        p_center: (n_c, 1) np.ndarray of barycenter's distribution
+        weights: a dictionary, whose keys are graph ids and values are float number of weight
+        loss_type: 'L2' the Euclidean loss type for Gromov-Wasserstein discrepancy
+                   'KL' the KL-divergence loss type for Gromov-Wasserstein discrepancy
+    Returns:
+        barycenter: (N, N) np.ndarray, the barycenter of cost matrix
+    """
+    barycenter = 0
+    if loss_type == "L2":
+        for n in costs.keys():
+            cost = costs[n]
+            trans = transports[n]
+            # barycenter += weights[n] * np.matmul(np.matmul(trans.T, cost), trans)
+            barycenter += weights[n] * (trans.T @ (cost @ trans))
+        barycenter /= np.matmul(p_center, p_center.T)
+    else:
+        for n in costs.keys():
+            cost = costs[n]
+            trans = transports[n]
+            barycenter += weights[n] * np.matmul(
+                np.matmul(trans.T, np.log(cost + 1e-15)), trans
+            )
+        barycenter /= np.matmul(p_center, p_center.T)
+        barycenter = np.exp(barycenter)
+    return barycenter
+
+
 def gromov_wasserstein_barycenter(
     costs: Dict,
     p_s: Dict,

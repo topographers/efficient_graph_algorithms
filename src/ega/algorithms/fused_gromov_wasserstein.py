@@ -13,8 +13,25 @@ class StopError(Exception):
     pass
 
 
+def fast_multiply_matrix_square(integrator, field):
+    """
+    Fast mutiplication with Hadamard square of a matrix and a vector
+    Args : integrator : fast graph field integrator to compute einsum with a vector
+    """
+    assert field.shape[1] == 1
+    partial_field = integrator.integrate_graph_field(np.diag(field.squeeze())).T
+    return np.diag(integrator.integrate_graph_field(partial_field)).reshape(-1, 1)
+
+
 def init_matrix(
-    C1, C2, p, q, loss_fun="square_loss", method_type=None, target_integrator=None
+    C1,
+    C2,
+    p,
+    q,
+    loss_fun="square_loss",
+    method_type=None,
+    source_integrator=None,
+    target_integrator=None,
 ):
     """Return loss matrices and tensors for Gromov-Wasserstein fast computation
     Returns the value of \mathcal{L}(C1,C2) \otimes T with the selected loss
@@ -40,7 +57,8 @@ def init_matrix(
          Coupling between source and target spaces
     p : ndarray, shape (ns,)
     method_type : str fast if None defaults to brute force
-    target_integrator : Callable , fast graph field integrator
+    source_integrator : Callable , fast graph field integrator for source points
+    target_integrator : Callable , fast graph field integrator for target points
     Returns
     -------
     constC : ndarray, shape (ns, nt)
@@ -84,22 +102,44 @@ def init_matrix(
         def h2(b):
             return np.log(b + 1e-15)
 
-    constC1 = np.dot(np.dot(f1(C1), p.reshape(-1, 1)), np.ones(len(q)).reshape(1, -1))
-    if (method_type is None) or (loss_fun == "square_loss"):
+    if method_type is None:
+        constC1 = np.dot(
+            np.dot(f1(C1), p.reshape(-1, 1)), np.ones(len(q)).reshape(1, -1)
+        )
         constC2 = np.dot(
             np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T)
         )
-    elif (method_type is not None) and (loss_fun == "kl_loss"):
-        constC2_partial = (
-            target_integrator.integrate_graph_field(q.reshape(1, -1).T)
-        ).T
-        constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), constC2_partial)
     else:
-        raise ValueError("Unsupported combination of loss and methods")
-    constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T))
+        if loss_fun == "square_loss":
+            constC1 = np.dot(
+                fast_multiply_matrix_square(source_integrator, p.reshape(-1, 1)),
+                np.ones(len(q)).reshape(1, -1),
+            )
+            constC2 = np.dot(
+                np.ones(len(p)).reshape(-1, 1),
+                fast_multiply_matrix_square(target_integrator, q.reshape(-1, 1)).T,
+            )
+
+        elif loss_fun == "kl_loss":
+            constC1 = np.dot(
+                np.dot(f1(C1), p.reshape(-1, 1)), np.ones(len(q)).reshape(1, -1)
+            )  # no idea how to make it faster
+            constC2_partial = (
+                target_integrator.integrate_graph_field(q.reshape(1, -1).T)
+            ).T
+            constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), constC2_partial)
+        else:
+            raise ValueError("Unsupported combination of loss and methods")
     constC = constC1 + constC2
-    hC1 = h1(C1)
-    hC2 = h2(C2)
+
+    if method_type is None:
+        hC1 = h1(C1)
+        hC2 = h2(C2)
+    else:
+        if loss_fun == "square_loss":
+            hC1, hC2 = None, None
+        else:
+            hC1, hC2 = None, h2(C2)
 
     return constC, hC1, hC2
 
@@ -373,31 +413,47 @@ def gw_lp(
             fourier_transform,
         )
         if loss_fun == "square_loss":
-            constC, _, _ = init_matrix(
-                C1, C2, p, q, loss_fun, method_type=method_type, target_integrator=None
-            )
-            hC1, hC2 = None, None
-        elif loss_fun == "kl_loss":
-            constC, _, hC2 = init_matrix(
+            constC, hC1, hC2 = init_matrix(
                 C1,
                 C2,
                 p,
                 q,
                 loss_fun,
                 method_type=method_type,
+                source_integrator=dfgf_s_integrator,
                 target_integrator=dfgf_t_integrator,
             )
-            hC1 = None
+        elif loss_fun == "kl_loss":
+            constC, hC1, hC2 = init_matrix(
+                C1,
+                C2,
+                p,
+                q,
+                loss_fun,
+                method_type=method_type,
+                source_integrator=None,
+                target_integrator=dfgf_t_integrator,
+            )
         else:
             raise ValueError("incorrect loss function used")
     else:
         dfgf_s_integrator = None
         dfgf_t_integrator = None
         constC, hC1, hC2 = init_matrix(
-            C1, C2, p, q, loss_fun, method_type=method_type, target_integrator=None
+            C1,
+            C2,
+            p,
+            q,
+            loss_fun,
+            method_type=method_type,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
         )
 
-    M = np.zeros((C1.shape[0], C2.shape[0]))
+    if method_type is None:
+        M = np.zeros((C1.shape[0], C2.shape[0]))
+    else:
+        M = np.zeros((p.shape[0], q.shape[0]))
 
     if G0 is None:
         G0 = p[:, None] * q[None, :]
@@ -483,399 +539,3 @@ def gw_lp(
             verbose=verbose,
         )
         return res
-
-
-def fgw_lp(
-    M, C1, C2, p, q, loss_fun="square_loss", alpha=0.5, armijo=True, G0=None, **kwargs
-):
-    """
-    Computes the FGW distance between two graphs see [3]
-    .. math::
-        \gamma = arg\min_\gamma (1-\alpha)*<\gamma,M>_F + alpha* \sum_{i,j,k,l} L(C1_{i,k},C2_{j,l})*T_{i,j}*T_{k,l}
-        s.t. \gamma 1 = p
-             \gamma^T 1= q
-             \gamma\geq 0
-    where :
-    - M is the (ns,nt) metric cost matrix
-    - :math:`f` is the regularization term ( and df is its gradient)
-    - a and b are source and target weights (sum to 1)
-    The algorithm used for solving the problem is conditional gradient as discussed in  [1]_
-    Parameters
-    ----------
-    M  : ndarray, shape (ns, nt)
-         Metric cost matrix between features across domains
-    C1 : ndarray, shape (ns, ns)
-         Metric cost matrix respresentative of the structure in the source space
-    C2 : ndarray, shape (nt, nt)
-         Metric cost matrix espresentative of the structure in the target space
-    p :  ndarray, shape (ns,)
-         distribution in the source space
-    q :  ndarray, shape (nt,)
-         distribution in the target space
-    loss_fun :  string,optionnal
-        loss function used for the solver
-    max_iter : int, optional
-        Max number of iterations
-    tol : float, optional
-        Stop threshold on error (>0)
-    verbose : bool, optional
-        Print information along iterations
-    log : bool, optional
-        record log if True
-    armijo : bool, optional
-        If True the steps of the line-search is found via an armijo research. Else closed form is used.
-        If there is convergence issues use False.
-    **kwargs : dict
-        parameters can be directly pased to the ot.optim.cg solver
-    Returns
-    -------
-    gamma : (ns x nt) ndarray
-        Optimal transportation matrix for the given parameters
-    log : dict
-        log dictionary return only if log==True in parameters
-    References
-    ----------
-    .. [3] Vayer Titouan, Chapel Laetitia, Flamary R{\'e}mi, Tavenard Romain
-          and Courty Nicolas
-        "Optimal Transport for structured data with application on graphs"
-        International Conference on Machine Learning (ICML). 2019.
-    """
-
-    constC, hC1, hC2 = init_matrix(C1, C2, p, q, loss_fun)
-
-    if G0 is None:
-        G0 = p[:, None] * q[None, :]
-    else:  # check marginals
-        np.testing.assert_allclose(G0.sum(axis=1), p, atol=1e-08)
-        np.testing.assert_allclose(G0.sum(axis=0), q, atol=1e-08)
-
-    def f(G):
-        return gwloss(constC, hC1, hC2, G)
-
-    def df(G):
-        return gwggrad(constC, hC1, hC2, G)
-
-    return optimization.cg(
-        p,
-        q,
-        (1 - alpha) * M,
-        alpha,
-        f,
-        df,
-        G0,
-        armijo=armijo,
-        C1=C1,
-        C2=C2,
-        constC=constC,
-        alpha_min=0,
-        alpha_max=1,
-        **kwargs
-    )
-
-
-def update_square_loss(p, lambdas, T, Cs):
-    """
-    Updates C according to the L2 Loss kernel with the S Ts couplings
-    calculated at each iteration
-    Parameters
-    ----------
-    p  : ndarray, shape (N,)
-         masses in the targeted barycenter
-    lambdas : list of float
-              list of the S spaces' weights
-    T : list of S np.ndarray(ns,N)
-        the S Ts couplings calculated at each iteration
-    Cs : list of S ndarray, shape(ns,ns)
-         Metric cost matrices
-    Returns
-    ----------
-    C : ndarray, shape (nt,nt)
-        updated C matrix
-    """
-    tmpsum = sum(
-        [lambdas[s] * np.dot(np.dot(T[s].T, Cs[s]), T[s]) for s in range(len(T))]
-    )
-    ppt = np.outer(p, p)
-
-    return tmpsum / ppt
-
-
-def update_kl_loss(p, lambdas, T, Cs):
-    r"""
-    Updates :math:`\mathbf{C}` according to the KL Loss kernel with the `S` :math:`\mathbf{T}_s` couplings calculated at each iteration
-    Parameters
-    ----------
-    p  : array-like, shape (N,)
-        Weights in the targeted barycenter.
-    lambdas : list of float
-        List of the `S` spaces' weights
-    T : list of S array-like of shape (ns,N)
-        The `S` :math:`\mathbf{T}_s` couplings calculated at each iteration.
-    Cs : list of S array-like, shape(ns,ns)
-        Metric cost matrices.
-    Returns
-    ----------
-    C : array-like, shape (`ns`, `ns`)
-        updated :math:`\mathbf{C}` matrix
-    """
-
-    tmpsum = sum(
-        [lambdas[s] * np.dot(np.dot(T[s].T, Cs[s]), T[s]) for s in range(len(T))]
-    )
-    ppt = np.outer(p, p)
-
-    return np.exp(tmpsum / ppt)
-
-
-def update_cross_feature_matrix(X, Y):
-
-    """
-    Updates M the distance matrix between the features
-    calculated at each iteration
-    ----------
-    X : ndarray, shape (N,d)
-        First features matrix, N: number of samples, d: dimension of the features
-    Y : ndarray, shape (M,d)
-        Second features matrix, N: number of samples, d: dimension of the features
-    Returns
-    ----------
-    M : ndarray, shape (N,M)
-
-    """
-
-    return ot.dist(reshaper(np.array(X)), reshaper(np.array(Y)))
-
-
-def update_Ms(X, Ys):
-
-    l = [
-        np.asarray(update_cross_feature_matrix(X, Ys[s]), dtype=np.float64)
-        for s in range(len(Ys))
-    ]
-
-    return l
-
-
-def update_feature_matrix(lambdas, Ys, Ts, p):
-
-    """
-    Updates the feature with respect to the S Ts couplings. See "Solving the barycenter problem with Block Coordinate Descent (BCD)" in [3]
-    calculated at each iteration
-    Parameters
-    ----------
-    p  : ndarray, shape (N,)
-         masses in the targeted barycenter
-    lambdas : list of float
-              list of the S spaces' weights
-    Ts : list of S np.ndarray(ns,N)
-        the S Ts couplings calculated at each iteration
-    Ys : list of S ndarray, shape(d,ns)
-         The features
-    Returns
-    ----------
-    X : ndarray, shape (d,N)
-
-    References
-    ----------
-    .. [3] Vayer Titouan, Chapel Laetitia, Flamary R{\'e}mi, Tavenard Romain
-          and Courty Nicolas
-        "Optimal Transport for structured data with application on graphs"
-        International Conference on Machine Learning (ICML). 2019.
-    """
-
-    p = np.diag(
-        np.array(1 / p).reshape(
-            -1,
-        )
-    )
-
-    tmpsum = tmpsum = sum(
-        [lambdas[s] * np.dot(Ys[s], Ts[s].T) * p[None, :] for s in range(len(Ts))]
-    )
-
-    return tmpsum
-
-
-def fgw_barycenters(
-    N,
-    Ys,
-    Cs,
-    ps,
-    lambdas,
-    alpha,
-    fixed_structure=False,
-    fixed_features=False,
-    p=None,
-    loss_fun="square_loss",
-    max_iter=100,
-    tol=1e-9,
-    verbose=False,
-    random_seed=42,
-    log=True,
-    init_C=None,
-    init_X=None,
-):
-
-    """
-    Compute the fgw barycenter as presented eq (5) in [3].
-    ----------
-    N : integer
-        Desired number of samples of the target barycenter
-    Ys: list of ndarray, each element has shape (ns,d)
-        Features of all samples
-    Cs : list of ndarray, each element has shape (ns,ns)
-         Structure matrices of all samples
-    ps : list of ndarray, each element has shape (ns,)
-        masses of all samples
-    lambdas : list of float
-              list of the S spaces' weights
-    alpha : float
-            Alpha parameter for the fgw distance
-    fixed_structure :  bool
-                       Wether to fix the structure of the barycenter during the updates
-    fixed_features :  bool
-                       Wether to fix the feature of the barycenter during the updates
-    init_C :  ndarray, shape (N,N), optional
-              initialization for the barycenters' structure matrix. If not set random init
-    init_X :  ndarray, shape (N,d), optional
-              initialization for the barycenters' features. If not set random init
-    Returns
-    ----------
-    X : ndarray, shape (N,d)
-        Barycenters' features
-    C : ndarray, shape (N,N)
-        Barycenters' structure matrix
-    log_:
-        T : list of (N,ns) transport matrices
-        Ms : all distance matrices between the feature of the barycenter and the other features dist(X,Ys) shape (N,ns)
-    References
-    ----------
-    .. [3] Vayer Titouan, Chapel Laetitia, Flamary R{\'e}mi, Tavenard Romain
-          and Courty Nicolas
-        "Optimal Transport for structured data with application on graphs"
-        International Conference on Machine Learning (ICML). 2019.
-    """
-    np.random.seed(random_seed)
-    S = len(Cs)
-    d = reshaper(Ys[0]).shape[1]  # dimension on the node features
-    if p is None:
-        p = np.ones(N) / N
-
-    Cs = [np.asarray(Cs[s], dtype=np.float64) for s in range(S)]
-    Ys = [np.asarray(Ys[s], dtype=np.float64) for s in range(S)]
-
-    lambdas = np.asarray(lambdas, dtype=np.float64)
-
-    if fixed_structure:
-        if init_C is None:
-            C = Cs[0]  # hack initialization
-        else:
-            C = init_C
-    else:
-        if init_C is None:
-            xalea = np.random.randn(N, 2)
-            C = dist(xalea, xalea)
-            C /= C.max()
-        else:
-            C = init_C
-
-    if fixed_features:
-        if init_X is None:
-            X = Ys[0]  # hack as well
-        else:
-            X = init_X
-    else:
-        if init_X is None:
-            X = np.zeros((N, d))
-        else:
-            X = init_X
-
-    T = [np.outer(p, q) for q in ps]  # aligning with POT code
-    # T=[random_gamma_init(p,q) for q in ps]
-
-    # X is N,d
-    # Ys is ns,d
-    Ms = update_Ms(X, Ys)
-    # Ms is N,ns
-
-    cpt = 0
-    err_feature = 1
-    err_structure = 1
-
-    if log:
-        log_ = {}
-        log_["err_feature"] = []
-        log_["err_structure"] = []
-        log_["Ts_iter"] = []
-
-    while (err_feature > tol or err_structure > tol) and cpt < max_iter:
-        Cprev = C
-        Xprev = X
-
-        if not fixed_features:
-            Ys_temp = [reshaper(y).T for y in Ys]
-            X = update_feature_matrix(lambdas, Ys_temp, T, p)
-
-        # X must be N,d
-        # Ys must be ns,d
-        Ms = update_Ms(X.T, Ys)
-
-        if not fixed_structure:
-            if loss_fun == "square_loss":
-                # T must be ns,N
-                # Cs must be ns,ns
-                # p must be N,1
-                T_temp = [t.T for t in T]
-                C = update_square_loss(p, lambdas, T_temp, Cs)
-
-        # Ys must be d,ns
-        # Ts must be N,ns
-        # p must be N,1
-        # Ms is N,ns
-        # C is N,N
-        # Cs is ns,ns
-        # p is N,1
-        # ps is ns,1
-
-        T = [
-            fgw_lp(
-                Ms[s],
-                C,
-                Cs[s],
-                p,
-                ps[s],
-                loss_fun,
-                alpha,
-                numItermax=max_iter,
-                stopThr=1e-5,
-                verbose=verbose,
-            )
-            for s in range(S)
-        ]
-
-        # T is N,ns
-
-        err_feature = np.linalg.norm(X - Xprev.reshape(d, N))  # TODO:CHECK
-        err_structure = np.linalg.norm(C - Cprev)
-
-        if log:
-            log_["err_feature"].append(err_feature)
-            log_["err_structure"].append(err_structure)
-            log_["Ts_iter"].append(T)
-
-        if verbose:
-            if cpt % 200 == 0:
-                print("{:5s}|{:12s}".format("It.", "Err") + "\n" + "-" * 19)
-            print("{:5d}|{:8e}|".format(cpt, err_structure))
-            print("{:5d}|{:8e}|".format(cpt, err_feature))
-
-        cpt += 1
-    if log:
-        log_["T"] = T  # ce sont les matrices du barycentre de la target vers les Ys
-        log_["p"] = p
-        log_["Ms"] = Ms  # Ms sont de tailles N,ns
-
-    if log:
-        return X.T, C, log_
-    else:
-        return X.T, C
