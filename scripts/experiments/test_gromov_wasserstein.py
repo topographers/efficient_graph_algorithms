@@ -4,7 +4,7 @@ import ot
 import random
 import time
 import argparse
-from ega.algorithms.gromov_wasserstein_graphs import gromov_wasserstein_discrepancy
+from ega.algorithms.fused_gromov_wasserstein import gw_lp
 
 parser = argparse.ArgumentParser(
     description="Testing computations of Gromov Wasserstein discrepancy"
@@ -27,6 +27,12 @@ parser.add_argument(
     default=32,
     type=int,
     help="Number of orthogonal random features, 16 and 32 works best for us. 64 produces bad results.",
+)
+parser.add_argument(
+    "--use_armijo",
+    default=True,
+    type=bool,
+    help="Whether to armijo line search algorithms. Turn it off if there are numerical instabilities",
 )
 
 
@@ -59,59 +65,58 @@ def main():
     Cs[Cs > args.epsilon] = 0
     Ct[Ct > args.epsilon] = 0
 
-    # the key hyperparameters of GW distance
-    ot_dict = {
-        "loss_type": "L2",
-        "ot_method": "proximal",
-        "beta": 0.2,
-        "outer_iteration": 1000,  # outer, inner iteration, error bound of optimal transport
-        "iter_bound": 1e-10,
-        "inner_iteration": 2,
-        "sk_bound": 1e-10,
-        "node_prior": 10,
-        "max_iter": 5,  # iteration and error bound for calcuating barycenter
-        "cost_bound": 1e-16,
-        "update_p": False,  # optional updates of source distribution
-        "lr": 0,
-        "alpha": 0,
-    }
-
-    # test baseline method
+    # test the baseline algorithm
     time_s = time.time()
-    Cs1 = sp.linalg.expm(args.lambda_par * Cs)
-    Ct1 = sp.linalg.expm(args.lambda_par * Ct)
-    T, d, _ = gromov_wasserstein_discrepancy(
-        Cs1, Ct1, p.reshape(-1, 1), q.reshape(-1, 1), ot_dict
+    Cs1 = linalg.expm(args.lambda_par * Cs)
+    Cs1 = (
+        Cs1 + Cs1.T
+    ) / 2  # have to symmetrize due to small numerical instabilities. depends on lambda again
+    Ct1 = linalg.expm(args.lambda_par * Ct)
+    Ct1 = (Ct1 + Ct1.T) / 2
+    trans0, log0 = gw_lp(
+        C1=Cs1,
+        C2=Ct1,
+        p=p,
+        q=q,
+        loss_fun="square_loss",
+        alpha=0.5,
+        armijo=args.use_armijo,
+        G0=None,
+        log=True,
     )
     elapsed_time = time.time() - time_s
     del Cs1, Ct1
 
-    # test ours
-    time_s1 = time.time()
-    T1, d1, _ = gromov_wasserstein_discrepancy(
-        cost_s=None,
-        cost_t=None,
-        p_s=p.reshape(-1, 1),
-        p_t=q.reshape(-1, 1),
-        ot_hyperpara=ot_dict,
-        trans0=None,
+    time1 = time.time()
+    trans1, log1 = gw_lp(
+        C1=None,
+        C2=None,
+        p=p,
+        q=q,
+        loss_fun="square_loss",
+        alpha=0.5,
+        armijo=args.use_armijo,
+        G0=None,
+        log=True,
         method_type="fast",
         source_positions=xs,
         target_positions=xt,
         source_epsilon=args.epsilon,
+        target_epsilon=args.epsilon,
         source_lambda_par=args.lambda_par,
+        target_lambda_par=args.lambda_par,
         num_rand_features=args.number_random_feats,
         dim=3,
-        target_epsilon=args.epsilon,
-        target_lambda_par=args.lambda_par,
     )
-    elapsed_time1 = time.time() - time_s1
+    elapsed_time1 = time.time() - time1
 
-    print(f"Ground truth transport cost is {d}")
-    print(f"Using fast matrix multiplication, truth transport cost is {d1}")
+    print(f"Ground truth transport cost is {log0['gw_dist']}")
+    print(
+        f"Using fast matrix multiplication, truth transport cost is {log1['gw_dist']}"
+    )
     print(f"Time taken for computing Ground truth transport cost is {elapsed_time}")
     print(f"Time taken for computing fast transport cost is {elapsed_time1}")
-    print(f"Difference between the transport matrices are {((T-T1)**2).sum()}")
+    print(f"Difference between the transport matrices are {((trans0-trans1)**2).sum()}")
 
 
 if __name__ == "__main__":
