@@ -10,6 +10,8 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.special import softmax
 from typing import List, Dict, Tuple, Callable
+
+from ega.algorithms.graph_diffusion_gf_integrator import DFGFIntegrator
 from ega.util.mesh_utils import (
     random_projection_creator,
     density_function,
