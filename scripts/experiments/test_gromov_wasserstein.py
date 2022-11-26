@@ -67,11 +67,11 @@ def main():
 
     # test the baseline algorithm
     time_s = time.time()
-    Cs1 = linalg.expm(args.lambda_par * Cs)
+    Cs1 = sp.linalg.expm(args.lambda_par * Cs)
     Cs1 = (
         Cs1 + Cs1.T
     ) / 2  # have to symmetrize due to small numerical instabilities. depends on lambda again
-    Ct1 = linalg.expm(args.lambda_par * Ct)
+    Ct1 = sp.linalg.expm(args.lambda_par * Ct)
     Ct1 = (Ct1 + Ct1.T) / 2
     trans0, log0 = gw_lp(
         C1=Cs1,
@@ -98,7 +98,7 @@ def main():
         armijo=args.use_armijo,
         G0=None,
         log=True,
-        method_type="fast",
+        method_type="diffusion",
         source_positions=xs,
         target_positions=xt,
         source_epsilon=args.epsilon,

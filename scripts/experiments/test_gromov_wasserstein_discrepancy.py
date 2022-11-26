@@ -95,7 +95,7 @@ def main():
         p_t=q.reshape(-1, 1),
         ot_hyperpara=ot_dict,
         trans0=None,
-        method_type="fast",
+        method_type="diffusion",
         source_positions=xs,
         target_positions=xt,
         source_epsilon=args.epsilon,
