@@ -7,7 +7,13 @@ import optimization
 from ega.util.wasserstein_utils import dist, reshaper
 from scipy import stats
 from scipy.sparse import random
-
+from ega.algorithms.graph_diffusion_gf_integrator import DFGFIntegrator
+from ega.algorithms.separation_gf_integrator import SeparationGFIntegrator
+from ega.util.mesh_utils import (
+    random_projection_creator,
+    density_function,
+    fourier_transform,
+)
 
 class StopError(Exception):
     pass
@@ -109,6 +115,7 @@ def init_matrix(
         constC2 = np.dot(
             np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T)
         )
+
     elif method_type == 'diffusion':
         if loss_fun == "square_loss":
             constC1 = np.dot(
@@ -128,12 +135,21 @@ def init_matrix(
                 target_integrator.integrate_graph_field(q.reshape(1, -1).T)
             ).T
             constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), constC2_partial)
+
         else:
             raise ValueError("Unsupported combination of loss and methods")
+
     elif method_type == 'separator' :
-        pass 
+        if loss_fun == 'square_loss' :
+            constC1 = np.dot(source_integrator.integrate_graph_field(p.reshape(-1,1)), np.ones(len(q)).reshape(1, -1))
+            constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), target_integrator.integrate_graph_field(q.reshape(-1,1)).T)
+
+        else :
+            raise NotImplementedError("KL div loss is not implemented")
+
     else : 
-        raise ValueError("Unsupported method type")
+      raise ValueError("Unsupported method type")
+
     constC = constC1 + constC2
 
     if method_type is None:
@@ -307,10 +323,10 @@ def gwggrad(
 
 
 def gw_lp(
-    C1,
-    C2,
-    p,
-    q,
+    C1=None,
+    C2=None,
+    p=None,
+    q=None,
     loss_fun="square_loss",
     alpha=1,
     armijo=True,
@@ -325,6 +341,15 @@ def gw_lp(
     target_lambda_par: float = None,
     num_rand_features: int = None,
     dim: int = None,
+    source_adjacency_lists=None,
+    source_weights_lists=None,
+    source_vertices=None,
+    source_unit_size=None,
+    threshold_nb_vertices=None,
+    target_adjacency_lists=None,
+    target_weights_lists=None,
+    target_vertices=None,
+    target_unit_size=None,
     verbose=False,
 ):
 
@@ -367,7 +392,7 @@ def gw_lp(
         If None the initial transport plan of the solver is pq^T.
         Otherwise G0 must satisfy marginal constraints and will be used as initial transport of the solver.
     The rest of the parameters are optional and only used for fast matrix vector multiplication.
-        method_type : Anything other than None defaults to fast matrix vector multiplication
+        method_type : Choose from [None, "diffusion", "separator"]
         source_positions : (n_s, dim) location of points in d-dim Euclidean space.
         target_positions : (n_t, dim) location of points in d-dim Euclidean space.
         source_epsilon : parameter that controls the epsilon neighbor of source points
@@ -395,7 +420,7 @@ def gw_lp(
         mathematics 11.4 (2011): 417-487.
     """
 
-    if method_type is not None:
+    if method_type == 'diffusion':
         dfgf_s_integrator = DFGFIntegrator(
             source_positions,
             source_epsilon,
@@ -440,7 +465,8 @@ def gw_lp(
             )
         else:
             raise ValueError("incorrect loss function used")
-    else:
+
+    elif method_type is None :
         dfgf_s_integrator = None
         dfgf_t_integrator = None
         constC, hC1, hC2 = init_matrix(
@@ -453,6 +479,50 @@ def gw_lp(
             source_integrator=dfgf_s_integrator,
             target_integrator=dfgf_t_integrator,
         )
+
+    elif method_type == 'separator' :
+        if loss_fun == 'square_loss':
+            f_fun_s = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_t = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_s_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            f_fun_t_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            dfgf_s_sq_integrator = SeparationGFIntegrator(
+                adjacency_lists=source_adjacency_lists,
+                weights_lists=source_weights_lists,
+                vertices=source_vertices,
+                f_fun=f_fun_s_sq,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_t_sq_integrator = SeparationGFIntegrator(
+                adjacency_lists=target_adjacency_lists,
+                weights_lists=target_weights_lists,
+                vertices=target_vertices,
+                f_fun=f_fun_t_sq,
+                unit_size=target_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_s_integrator = SeparationGFIntegrator(
+                adjacency_lists=source_adjacency_lists,
+                weights_lists=source_weights_lists,
+                vertices=source_vertices,
+                f_fun=f_fun_s,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_t_integrator = SeparationGFIntegrator(
+                adjacency_lists=target_adjacency_lists,
+                weights_lists=target_weights_lists,
+                vertices=target_vertices,
+                f_fun=f_fun_t,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            constC, hC1, hC2 = init_matrix(C1, C2, p, q, loss_fun, method_type=method_type, source_integrator=dfgf_s_sq_integrator, target_integrator=dfgf_t_sq_integrator)
+        else :
+            raise NotImplementedError("KL Div Loss is not implemented")
+    else :
+        raise ValueError("Unsupported method type")
 
     if method_type is None:
         M = np.zeros((C1.shape[0], C2.shape[0]))
