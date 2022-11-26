@@ -58,8 +58,8 @@ def main():
     ### construct distance matrices
     Cs = sp.spatial.distance.cdist(xs, xs, "minkowski", p=1)
     Ct = sp.spatial.distance.cdist(xt, xt, "minkowski", p=1)
-    p = ot.unif(n_samples)
-    q = ot.unif(n_samples)
+    p = ot.unif(args.n_samples)
+    q = ot.unif(args.n_samples)
 
     ## sparsify the matrices
     Cs[Cs > args.epsilon] = 0
