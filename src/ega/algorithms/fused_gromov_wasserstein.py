@@ -15,6 +15,7 @@ from ega.util.mesh_utils import (
     fourier_transform,
 )
 
+
 class StopError(Exception):
     pass
 
@@ -116,7 +117,7 @@ def init_matrix(
             np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T)
         )
 
-    elif method_type == 'diffusion':
+    elif method_type == "diffusion":
         if loss_fun == "square_loss":
             constC1 = np.dot(
                 fast_multiply_matrix_square(source_integrator, p.reshape(-1, 1)),
@@ -139,16 +140,22 @@ def init_matrix(
         else:
             raise ValueError("Unsupported combination of loss and methods")
 
-    elif method_type == 'separator' :
-        if loss_fun == 'square_loss' :
-            constC1 = np.dot(source_integrator.integrate_graph_field(p.reshape(-1,1)), np.ones(len(q)).reshape(1, -1))
-            constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), target_integrator.integrate_graph_field(q.reshape(-1,1)).T)
+    elif method_type == "separator":
+        if loss_fun == "square_loss":
+            constC1 = np.dot(
+                source_integrator.integrate_graph_field(p.reshape(-1, 1)),
+                np.ones(len(q)).reshape(1, -1),
+            )
+            constC2 = np.dot(
+                np.ones(len(p)).reshape(-1, 1),
+                target_integrator.integrate_graph_field(q.reshape(-1, 1)).T,
+            )
 
-        else :
+        else:
             raise NotImplementedError("KL div loss is not implemented")
 
-    else : 
-      raise ValueError("Unsupported method type")
+    else:
+        raise ValueError("Unsupported method type")
 
     constC = constC1 + constC2
 
@@ -420,7 +427,7 @@ def gw_lp(
         mathematics 11.4 (2011): 417-487.
     """
 
-    if method_type == 'diffusion':
+    if method_type == "diffusion":
         dfgf_s_integrator = DFGFIntegrator(
             source_positions,
             source_epsilon,
@@ -466,7 +473,7 @@ def gw_lp(
         else:
             raise ValueError("incorrect loss function used")
 
-    elif method_type is None :
+    elif method_type is None:
         dfgf_s_integrator = None
         dfgf_t_integrator = None
         constC, hC1, hC2 = init_matrix(
@@ -480,8 +487,8 @@ def gw_lp(
             target_integrator=dfgf_t_integrator,
         )
 
-    elif method_type == 'separator' :
-        if loss_fun == 'square_loss':
+    elif method_type == "separator":
+        if loss_fun == "square_loss":
             f_fun_s = lambda x: np.exp(-source_lambda_par * x)
             f_fun_t = lambda x: np.exp(-source_lambda_par * x)
             f_fun_s_sq = lambda x: np.exp(-2 * source_lambda_par * x)
@@ -518,10 +525,19 @@ def gw_lp(
                 unit_size=source_unit_size,
                 threshold_nb_vertices=threshold_nb_vertices,
             )
-            constC, hC1, hC2 = init_matrix(C1, C2, p, q, loss_fun, method_type=method_type, source_integrator=dfgf_s_sq_integrator, target_integrator=dfgf_t_sq_integrator)
-        else :
+            constC, hC1, hC2 = init_matrix(
+                C1,
+                C2,
+                p,
+                q,
+                loss_fun,
+                method_type=method_type,
+                source_integrator=dfgf_s_sq_integrator,
+                target_integrator=dfgf_t_sq_integrator,
+            )
+        else:
             raise NotImplementedError("KL Div Loss is not implemented")
-    else :
+    else:
         raise ValueError("Unsupported method type")
 
     if method_type is None:
