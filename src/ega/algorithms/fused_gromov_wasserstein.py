@@ -56,7 +56,7 @@ def init_matrix(
     T :  ndarray, shape (ns, nt)
          Coupling between source and target spaces
     p : ndarray, shape (ns,)
-    method_type : str fast if None defaults to brute force
+    method_type : (str) Choose one of [None, "diffusion", "separator"]
     source_integrator : Callable , fast graph field integrator for source points
     target_integrator : Callable , fast graph field integrator for target points
     Returns
@@ -109,7 +109,7 @@ def init_matrix(
         constC2 = np.dot(
             np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T)
         )
-    else:
+    elif method_type == 'diffusion':
         if loss_fun == "square_loss":
             constC1 = np.dot(
                 fast_multiply_matrix_square(source_integrator, p.reshape(-1, 1)),
@@ -130,6 +130,10 @@ def init_matrix(
             constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), constC2_partial)
         else:
             raise ValueError("Unsupported combination of loss and methods")
+    elif method_type == 'separator' :
+        pass 
+    else : 
+        raise ValueError("Unsupported method type")
     constC = constC1 + constC2
 
     if method_type is None:
