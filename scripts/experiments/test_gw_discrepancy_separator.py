@@ -18,9 +18,6 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("--seed", default=42, type=int)
 parser.add_argument(
-    "--n_samples", default=3000, type=int, help="Number of random samples to draw"
-)
-parser.add_argument(
     "--lambda_par",
     default=1.0,
     type=float,
