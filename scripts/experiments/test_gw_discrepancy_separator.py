@@ -8,6 +8,7 @@ import scipy as sp
 import trimesh
 import ot
 import networkx as nx
+from scipy.sparse.csgraph import shortest_path
 
 from ega import default_trimesh_dataset_path
 from ega.util.mesh_utils import trimesh_to_adjacency_matrices
@@ -38,6 +39,9 @@ parser.add_argument(
 parser.add_argument(
     "--unit_size", default=1.0, type=float, help="unit size for balanced separator"
 )
+parser.add_argument(
+    "--edge_weight", default=.01, type=float, help="Edge weights for the adjacency matrices"
+)
 
 
 def main():
@@ -66,18 +70,30 @@ def main():
             os.path.join("data/trimesh/models", "unit_sphere.STL")
         )
 
-    source_adj = nx.adjacency_matrix(trimesh.graph.vertex_adjacency_graph(source_mesh))
-    target_adj = nx.adjacency_matrix(trimesh.graph.vertex_adjacency_graph(target_mesh))
-    Cs = np.exp(
-        -(args.lambda_par * source_adj.todense() * 0.01)
-    )  # to coincide with Han
-    Ct = np.exp(
-        -(args.lambda_par * target_adj.todense() * 0.01)
-    )  # @Han why are we doing this? see line 113 and 119
-    del source_adj, target_adj
+    source_graph = trimesh.graph.vertex_adjacency_graph(source_mesh)
+    nx.set_edge_attributes(source_graph, values = args.edge_weight, name = 'weight') #to coincide with Han
+    source_adj =  nx.adjacency_matrix(source_graph)
+    del source_graph
+
+    target_graph = trimesh.graph.vertex_adjacency_graph(target_mesh)
+    nx.set_edge_attributes(target_graph, values = args.edge_weight, name = 'weight') #to coincide with Han 
+    target_adj = nx.adjacency_matrix(target_graph)
+    del target_graph 
 
     p = ot.unif(len(source_vertices))
     q = ot.unif(len(target_vertices))
+
+    Cs = shortest_path(csgraph=source_adj, directed=False)
+    Cs = np.exp(
+        -args.lambda_par * Cs
+    )
+    Ct = shortest_path(csgraph=target_adj, directed=False)
+    Ct = np.exp(
+        -args.lambda_par * Ct
+    )
+    del source_adj, target_adj
+
+    
 
     # the key hyperparameters of GW distance
     ot_dict = {
