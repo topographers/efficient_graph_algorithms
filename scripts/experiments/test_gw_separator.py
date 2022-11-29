@@ -12,10 +12,10 @@ from scipy.sparse.csgraph import shortest_path
 
 from ega import default_trimesh_dataset_path
 from ega.util.mesh_utils import trimesh_to_adjacency_matrices
-from ega.algorithms.gromov_wasserstein_graphs import gromov_wasserstein_discrepancy
+from ega.algorithms.fused_gromov_wasserstein import gw_lp
 
 parser = argparse.ArgumentParser(
-    description="Testing computations of Gromov Wasserstein discrepancy using the Separator"
+    description="Testing computations of Gromov Wasserstein (POT) using the Separator"
 )
 parser.add_argument("--seed", default=42, type=int)
 parser.add_argument(
@@ -44,6 +44,12 @@ parser.add_argument(
     default=1.0,
     type=float,
     help="Edge weights for the adjacency matrices",
+)
+parser.add_argument(
+    "--use_armijo",
+    default=True,
+    type=bool,
+    help="Whether to armijo line search algorithms. Turn it off if there are numerical instabilities",
 )
 
 
@@ -87,37 +93,29 @@ def main():
 
     Cs = shortest_path(csgraph=source_adj, directed=False)
     Cs = np.exp(-args.lambda_par * Cs)
+    Cs = (Cs + Cs.T) / 2.0  # symmetrize
     Ct = shortest_path(csgraph=target_adj, directed=False)
     Ct = np.exp(-args.lambda_par * Ct)
+    Ct = (Ct + Ct.T) / 2.0  # symmetrize
     del source_adj, target_adj
 
     p = ot.unif(Cs.shape[0])
     q = ot.unif(Ct.shape[0])
 
-    # the key hyperparameters of GW distance
-    ot_dict = {
-        "loss_type": "L2",
-        "ot_method": "proximal",
-        "beta": 0.2,
-        "outer_iteration": 1000,  # outer, inner iteration, error bound of optimal transport
-        "iter_bound": 1e-10,
-        "inner_iteration": 2,
-        "sk_bound": 1e-10,
-        "node_prior": 10,
-        "max_iter": 5,  # iteration and error bound for calcuating barycenter
-        "cost_bound": 1e-16,
-        "update_p": False,  # optional updates of source distribution
-        "lr": 0,
-        "alpha": 0,
-    }
-
-    # test baseline method
+    # test baseline
     time_s = time.time()
-    T, d, _ = gromov_wasserstein_discrepancy(
-        Cs, Ct, p.reshape(-1, 1), q.reshape(-1, 1), ot_dict
+    trans0, log0 = gw_lp(
+        C1=Cs,
+        C2=Ct,
+        p=p,
+        q=q,
+        loss_fun="square_loss",
+        alpha=0.5,
+        armijo=args.use_armijo,
+        G0=None,
+        log=True,
     )
     elapsed_time = time.time() - time_s
-    del Cs, Ct
 
     # test ours
     # Define the necessary objects and parameters
@@ -135,24 +133,26 @@ def main():
 
     source_vertices = np.arange(len(source_adjacency_lists))
     target_vertices = np.arange(len(target_adjacency_lists))
-
-    time_s1 = time.time()
-    T1, d1, _ = gromov_wasserstein_discrepancy(
-        cost_s=None,
-        cost_t=None,
-        p_s=p.reshape(-1, 1),
-        p_t=q.reshape(-1, 1),
-        ot_hyperpara=ot_dict,
-        trans0=None,
+    time1 = time.time()
+    trans1, log1 = gw_lp(
+        C1=None,
+        C2=None,
+        p=p,
+        q=q,
+        loss_fun="square_loss",
+        alpha=0.5,
+        armijo=args.use_armijo,
+        G0=None,
+        log=True,
         method_type="separator",
         source_positions=None,
         target_positions=None,
-        source_epsilon=None,
+        source_epsilon=args.epsilon,
+        target_epsilon=args.epsilon,
         source_lambda_par=args.lambda_par,
+        target_lambda_par=args.lambda_par,
         num_rand_features=args.number_random_feats,
         dim=None,
-        target_epsilon=None,
-        target_lambda_par=args.lambda_par,
         source_adjacency_lists=source_adjacency_lists,
         source_weights_lists=source_weights_lists,
         source_vertices=source_vertices,
@@ -162,14 +162,15 @@ def main():
         target_weights_lists=target_weights_lists,
         target_vertices=target_vertices,
         target_unit_size=args.unit_size,
+        verbose=False,
     )
-    elapsed_time1 = time.time() - time_s1
+    elapsed_time1 = time.time() - time1
 
-    print(f"Ground truth transport cost is {d}")
-    print(f"Using fast matrix multiplication, transport cost is {d1}")
+    print(f"Ground truth transport cost is {log0['gw_dist']}")
+    print(f"Using fast matrix multiplication, transport cost is {log1['gw_dist']}")
     print(f"Time taken for computing Ground truth transport cost is {elapsed_time}")
     print(f"Time taken for computing fast transport cost is {elapsed_time1}")
-    print(f"Difference between the transport matrices are {((T-T1)**2).sum()}")
+    print(f"Difference between the transport matrices are {((trans0-trans1)**2).sum()}")
 
 
 if __name__ == "__main__":
