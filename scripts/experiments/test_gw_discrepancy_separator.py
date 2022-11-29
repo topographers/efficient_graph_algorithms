@@ -71,12 +71,14 @@ def main():
         )
 
     source_graph = trimesh.graph.vertex_adjacency_graph(source_mesh)
-    nx.set_edge_attributes(source_graph, values = args.edge_weight, name = 'weight') #to coincide with Han
+    if args.edge_weight != 1.0 :
+        nx.set_edge_attributes(source_graph, values = args.edge_weight, name = 'weight') 
     source_adj =  nx.adjacency_matrix(source_graph)
     del source_graph
 
     target_graph = trimesh.graph.vertex_adjacency_graph(target_mesh)
-    nx.set_edge_attributes(target_graph, values = args.edge_weight, name = 'weight') #to coincide with Han 
+    if args.edge_weight != 1.0 :
+        nx.set_edge_attributes(target_graph, values = args.edge_weight, name = 'weight')  
     target_adj = nx.adjacency_matrix(target_graph)
     del target_graph 
 
