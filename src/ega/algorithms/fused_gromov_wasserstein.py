@@ -889,16 +889,8 @@ def fgw_lp(
             target_integrator=dfgf_t_integrator,
             verbose=verbose,
         )
-        log0["gw_dist"] = gwloss(
-            constC,
-            hC1,
-            hC2,
-            res,
-            method_type=method_type,
-            loss_fun=loss_fun,
-            source_integrator=dfgf_s_integrator,
-            target_integrator=dfgf_t_integrator,
-        )
+        fgw_dist = log0['loss'][-1]
+        log0['fgw_dist'] = fgw_dist
         return res, log0
     else:
         res = optimization.cg(
