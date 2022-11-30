@@ -39,7 +39,7 @@ parser.add_argument(
     "--features_metric", 
     default = 'dirac',
     type=str,
-    help="Choose from dirac and hamming. Other methods are not yet implemented"
+    help="Choose from dirac and hamming. Other methods are not yet implemented",
 )
 
 def main():
@@ -60,12 +60,12 @@ def main():
     cov_t = np.matmul(r_t, r_t.T)
 
     Q = sp.linalg.sqrtm(cov_s)
-    xs = np.random.randn(n_samples, 3).dot(Q) + mu_s
+    xs = np.random.randn(args.n_samples, 3).dot(Q) + mu_s
     #generate random labels
-    ys = (np.random.randint(2, size=n_samples)).reshape(-1,1)
+    ys = (np.random.randint(2, size=args.n_samples)).reshape(-1,1)
     P = sp.linalg.sqrtm(cov_t)
-    xt = np.random.randn(n_samples, 3).dot(P) + mu_t
-    yt = np.random.randint(2, size=n_samples)
+    xt = np.random.randn(args.n_samples, 3).dot(P) + mu_t
+    yt = np.random.randint(2, size=args.n_samples)
     np.random.shuffle(yt)
     yt = yt.reshape(-1,1)
 
@@ -73,8 +73,8 @@ def main():
     Cs = sp.spatial.distance.cdist(xs,xs, 'minkowski', p=1)
     Ct = sp.spatial.distance.cdist(xt,xt, 'minkowski', p=1)
 
-    p = ot.unif(n_samples)
-    q = ot.unif(n_samples)
+    p = ot.unif(args.n_samples)
+    q = ot.unif(args.n_samples)
 
     if args.features_metric=='dirac':
         f=lambda x,y: x!=y
@@ -112,7 +112,7 @@ def main():
     del Cs1, Ct1
 
     time1 = time.time()
-    trans1, log1 = gw_lp(
+    trans1, log1 = fgw_lp(
         M=M,
         C1=None,
         C2=None,
