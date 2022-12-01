@@ -1,6 +1,6 @@
 """
 A Gromov-Wasserstein Learning Framework for Graph Analysis
-Code copied from Scalable Gromov-Wasserstein Learning for Graph Partitioning and Matching
+Base Code copied from Scalable Gromov-Wasserstein Learning for Graph Partitioning and Matching
 
 Basic functionalities include:
 1) Gromov-Wasserstein discrepancy (for graph partition)

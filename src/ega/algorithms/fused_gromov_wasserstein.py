@@ -1,4 +1,4 @@
-# Code copied from Optimal Transport for structured data with application on graphs
+# Base Code copied from Optimal Transport for structured data with application on graphs with some modification coming from the POT library
 # https://github.com/tvayer/FGW
 
 import numpy as np
