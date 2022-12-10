@@ -49,9 +49,13 @@ def main():
     P = sp.linalg.sqrtm(cov_t)
     xt = np.random.randn(args.n_samples, 3).dot(P) + mu_t
 
+    # Replace xs and xt with points from meshes
+
     ### construct distance matrices
     Cs = sp.spatial.distance.cdist(xs, xs, "minkowski", p=1)
     Ct = sp.spatial.distance.cdist(xt, xt, "minkowski", p=1)
+
+    # Replace with length of the point clouds
     p = ot.unif(args.n_samples)
     q = ot.unif(args.n_samples)
 
