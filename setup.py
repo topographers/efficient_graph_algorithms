@@ -12,7 +12,7 @@ setuptools.setup(
     long_description="TODO",
     long_description_content_type="text/markdown",
     url="https://github.com/topographers",
-    packages=['ega'],
+    packages=['ega', 'planar_separators'],
     package_dir={'': 'src'},
     classifiers=[
         "Programming Language :: Python :: 3",

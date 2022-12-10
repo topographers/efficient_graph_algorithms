@@ -1,9 +1,14 @@
-import scipy as sp
+import scipy
+import scipy.spatial
+import scipy.linalg
 import numpy as np
 import ot
 import random
 import time
 import argparse
+
+import trimesh
+
 from ega.algorithms.gromov_wasserstein_graphs import gromov_wasserstein_discrepancy
 
 parser = argparse.ArgumentParser(
@@ -35,29 +40,22 @@ def main():
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    ## generate data
-    mu_s = np.array([0, 0, 0])
-    r_s = np.random.rand(3, 3)
-    cov_s = np.matmul(r_s, r_s.T)
-
-    mu_t = np.array([4, 4, 4])
-    r_t = np.random.rand(3, 3)
-    cov_t = np.matmul(r_t, r_t.T)
-
-    Q = sp.linalg.sqrtm(cov_s)
-    xs = np.random.randn(args.n_samples, 3).dot(Q) + mu_s
-    P = sp.linalg.sqrtm(cov_t)
-    xt = np.random.randn(args.n_samples, 3).dot(P) + mu_t
-
     # Replace xs and xt with points from meshes
+    filepath = "../../data/curvox_dataset/meshes/Thingi10K/cat/textured.obj"
+
+    vertices = trimesh.load_mesh(filepath).vertices
+    xs = vertices[::7] * 0.9
+    xt = vertices[::13] * 1.1
+    print(f"Cat 1 has {len(xs)} vertices")
+    print(f"Cat 2 has {len(xt)} vertices")
 
     ### construct distance matrices
-    Cs = sp.spatial.distance.cdist(xs, xs, "minkowski", p=1)
-    Ct = sp.spatial.distance.cdist(xt, xt, "minkowski", p=1)
+    Cs = scipy.spatial.distance.cdist(xs, xs, "minkowski", p=1)
+    Ct = scipy.spatial.distance.cdist(xt, xt, "minkowski", p=1)
 
     # Replace with length of the point clouds
-    p = ot.unif(args.n_samples)
-    q = ot.unif(args.n_samples)
+    p = ot.unif(len(xs))
+    q = ot.unif(len(xt))
 
     ## sparsify the matrices
     Cs[Cs > args.epsilon] = 0
@@ -82,8 +80,8 @@ def main():
 
     # test baseline method
     time_s = time.time()
-    Cs1 = sp.linalg.expm(args.lambda_par * Cs)
-    Ct1 = sp.linalg.expm(args.lambda_par * Ct)
+    Cs1 = scipy.linalg.expm(args.lambda_par * Cs)
+    Ct1 = scipy.linalg.expm(args.lambda_par * Ct)
     T, d, _ = gromov_wasserstein_discrepancy(
         Cs1, Ct1, p.reshape(-1, 1), q.reshape(-1, 1), ot_dict
     )
