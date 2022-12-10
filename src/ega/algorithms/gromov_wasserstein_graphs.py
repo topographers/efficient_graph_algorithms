@@ -1,6 +1,6 @@
 """
 A Gromov-Wasserstein Learning Framework for Graph Analysis
-Code copied from Scalable Gromov-Wasserstein Learning for Graph Partitioning and Matching
+Base Code copied from Scalable Gromov-Wasserstein Learning for Graph Partitioning and Matching
 
 Basic functionalities include:
 1) Gromov-Wasserstein discrepancy (for graph partition)
@@ -12,6 +12,7 @@ from scipy.special import softmax
 from typing import List, Dict, Tuple, Callable
 
 from ega.algorithms.graph_diffusion_gf_integrator import DFGFIntegrator
+from ega.algorithms.separation_gf_integrator import SeparationGFIntegrator
 from ega.util.mesh_utils import (
     random_projection_creator,
     density_function,
@@ -186,7 +187,7 @@ def node_cost_st(
         loss_type: 'L2' the Euclidean loss type for Gromov-Wasserstein discrepancy
                    'KL' the KL-divergence loss type for Gromov-Wasserstein discrepancy
         prior: whether use node distribution similarity matrix as a prior
-         method_type: Any string now defaults to graph diffusion fast matrix multiplication
+        method_type : (str) One of the options from this list [None, 'diffusion', 'separator']
         source_integrator : Graph field integrator on source graph
         target_integrator : Graph field integrator on target graph
 
@@ -206,7 +207,7 @@ def node_cost_st(
             )
             f2_st = np.repeat((cost_t @ p_t).T, n_s, axis=0)
 
-    else:
+    elif method_type == "diffusion":
         n_s = p_s.shape[0]
         n_t = p_t.shape[0]
         if loss_type == "L2":
@@ -223,6 +224,22 @@ def node_cost_st(
             f2_st = np.repeat(
                 (target_integrator.integrate_graph_field(p_t)).T, n_s, axis=0
             )
+
+    elif method_type == "separator":
+        if loss_type == "L2":
+            n_s = p_s.shape[0]
+            n_t = p_t.shape[0]
+            f1_st = np.repeat(
+                source_integrator.integrate_graph_field(p_s), n_t, axis=1
+            )  # squared
+            f2_st = np.repeat(
+                (target_integrator.integrate_graph_field(p_t)).T, n_s, axis=0
+            )
+        else:
+            raise NotImplementedError("KL div loss is not implemented yet.")
+
+    else:
+        raise ValueError("Unsuppported method type")
 
     cost_st = f1_st + f2_st
     if prior is not None:
@@ -250,7 +267,7 @@ def node_cost(
         cost_st: (n_s, n_t) array, the estimated invariant cost between the nodes in two graphs
         loss_type: 'L2' the Euclidean loss type for Gromov-Wasserstein discrepancy
                    'KL' the KL-divergence loss type for Gromov-Wasserstein discrepancy
-        method_type: Any string now defaults to graph diffusion fast matrix multiplication
+        method_type : (str) One of the options from this list [None, 'diffusion', 'separator']
         source_integrator : Graph field integrator on source graph
         target_integrator : Graph field integrator on target graph
 
@@ -264,7 +281,7 @@ def node_cost(
         else:
             cost = cost_st - np.matmul(cost_s @ trans, (np.log(cost_t + 1e-15)).T)
 
-    else:
+    elif method_type == "diffusion":
         if loss_type == "L2":
             cost_partial = source_integrator.integrate_graph_field(trans)
             cost = (
@@ -276,6 +293,19 @@ def node_cost(
         else:
             cost_partial = source_integrator.integrate_graph_field(trans)
             cost = cost_st - np.matmul(cost_partial, (np.log(cost_t + 1e-15)).T)
+
+    elif method_type == "separator":
+        if loss_type == "L2":
+            cost_partial = source_integrator.integrate_graph_field(trans)
+            cost = (
+                cost_st
+                - 2 * (target_integrator.integrate_graph_field(cost_partial.T)).T
+            )
+        else:
+            raise NotImplementedError("KL div loss is not implemented yet")
+
+    else:
+        raise ValueError("Unsupported method type")
     return cost
 
 
@@ -295,6 +325,15 @@ def gromov_wasserstein_discrepancy(
     target_lambda_par: float = None,
     num_rand_features: int = None,
     dim: int = None,
+    source_adjacency_lists=None,
+    source_weights_lists=None,
+    source_vertices=None,
+    source_unit_size=None,
+    threshold_nb_vertices=None,
+    target_adjacency_lists=None,
+    target_weights_lists=None,
+    target_vertices=None,
+    target_unit_size=None,
 ) -> Tuple[np.ndarray, float, np.ndarray]:
     """
     Calculate Gromov-Wasserstein discrepancy with optionally-updated source probability
@@ -307,7 +346,7 @@ def gromov_wasserstein_discrepancy(
         ot_hyperpara: dictionary of hyperparameter
         trans0: optional (n_s, n_t) array, the initial transport
         The rest of the parameters are optional and only used for fast matrix vector multiplication.
-        method_type : Anything other than None defaults to fast matrix vector multiplication
+        method_type : (str) Choose from [None, "diffusion", "separator"]
         source_positions : (n_s, dim) location of points in d-dim Euclidean space.
         target_positions : (n_t, dim) location of points in d-dim Euclidean space.
         source_epsilon : parameter that controls the epsilon neighbor of source points
@@ -325,8 +364,12 @@ def gromov_wasserstein_discrepancy(
 
     if method_type is None:
         n_s = cost_s.shape[0]
-    else:
+    elif method_type == "diffusion":
         n_s = source_positions.shape[0]
+    elif method_type == "separator":
+        n_s = source_vertices.shape[0]
+    else:
+        raise ValueError("Unsupported method type")
 
     if ot_hyperpara["update_p"]:
         theta = np.zeros((n_s, 1))
@@ -341,7 +384,7 @@ def gromov_wasserstein_discrepancy(
 
     t = 0
     relative_error = np.inf
-    if method_type is not None:
+    if method_type == "diffusion":
         if ot_hyperpara["loss_type"] == "L2":
             dfgf_s_integrator = DFGFIntegrator(
                 source_positions,
@@ -375,20 +418,75 @@ def gromov_wasserstein_discrepancy(
                 fourier_transform,
             )
             dfgf_t_integrator = None
-    else:
+    elif method_type is None:
         dfgf_s_integrator, dfgf_t_integrator = None, None
+    elif method_type == "separator":
+        if ot_hyperpara["loss_type"] == "L2":
+            f_fun_s = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_t = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_s_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            f_fun_t_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            dfgf_s_sq_integrator = SeparationGFIntegrator(
+                adjacency_lists=source_adjacency_lists,
+                weights_lists=source_weights_lists,
+                vertices=source_vertices,
+                f_fun=f_fun_s_sq,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_t_sq_integrator = SeparationGFIntegrator(
+                adjacency_lists=target_adjacency_lists,
+                weights_lists=target_weights_lists,
+                vertices=target_vertices,
+                f_fun=f_fun_t_sq,
+                unit_size=target_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_s_integrator = SeparationGFIntegrator(
+                adjacency_lists=source_adjacency_lists,
+                weights_lists=source_weights_lists,
+                vertices=source_vertices,
+                f_fun=f_fun_s,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_t_integrator = SeparationGFIntegrator(
+                adjacency_lists=target_adjacency_lists,
+                weights_lists=target_weights_lists,
+                vertices=target_vertices,
+                f_fun=f_fun_t,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+        else:
+            raise NotImplementedError("KL div loss is not implemented")
+    else:
+        raise ValueError("Unsupported type of method")
     # calculate invariant cost matrix
-    cost_st = node_cost_st(
-        cost_s,
-        cost_t,
-        p_s,
-        p_t,
-        loss_type=ot_hyperpara["loss_type"],
-        prior=ot_hyperpara["node_prior"],
-        method_type=method_type,
-        source_integrator=dfgf_s_integrator,
-        target_integrator=dfgf_t_integrator,
-    )
+    if method_type != "separator":
+        cost_st = node_cost_st(
+            cost_s,
+            cost_t,
+            p_s,
+            p_t,
+            loss_type=ot_hyperpara["loss_type"],
+            prior=ot_hyperpara["node_prior"],
+            method_type=method_type,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+        )
+    else:
+        cost_st = node_cost_st(
+            cost_s,
+            cost_t,
+            p_s,
+            p_t,
+            loss_type=ot_hyperpara["loss_type"],
+            prior=ot_hyperpara["node_prior"],
+            method_type=method_type,
+            source_integrator=dfgf_s_sq_integrator,
+            target_integrator=dfgf_t_sq_integrator,
+        )
     while (
         relative_error > ot_hyperpara["iter_bound"]
         and t < ot_hyperpara["outer_iteration"]

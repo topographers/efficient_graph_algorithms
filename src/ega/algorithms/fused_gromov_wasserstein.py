@@ -1,4 +1,4 @@
-# Code copied from Optimal Transport for structured data with application on graphs
+# Base Code copied from Optimal Transport for structured data with application on graphs with some modification coming from the POT library
 # https://github.com/tvayer/FGW
 
 import numpy as np
@@ -7,6 +7,13 @@ import optimization
 from ega.util.wasserstein_utils import dist, reshaper
 from scipy import stats
 from scipy.sparse import random
+from ega.algorithms.graph_diffusion_gf_integrator import DFGFIntegrator
+from ega.algorithms.separation_gf_integrator import SeparationGFIntegrator
+from ega.util.mesh_utils import (
+    random_projection_creator,
+    density_function,
+    fourier_transform,
+)
 
 
 class StopError(Exception):
@@ -56,7 +63,7 @@ def init_matrix(
     T :  ndarray, shape (ns, nt)
          Coupling between source and target spaces
     p : ndarray, shape (ns,)
-    method_type : str fast if None defaults to brute force
+    method_type : (str) Choose one of [None, "diffusion", "separator"]
     source_integrator : Callable , fast graph field integrator for source points
     target_integrator : Callable , fast graph field integrator for target points
     Returns
@@ -109,7 +116,8 @@ def init_matrix(
         constC2 = np.dot(
             np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T)
         )
-    else:
+
+    elif method_type == "diffusion":
         if loss_fun == "square_loss":
             constC1 = np.dot(
                 fast_multiply_matrix_square(source_integrator, p.reshape(-1, 1)),
@@ -128,8 +136,27 @@ def init_matrix(
                 target_integrator.integrate_graph_field(q.reshape(1, -1).T)
             ).T
             constC2 = np.dot(np.ones(len(p)).reshape(-1, 1), constC2_partial)
+
         else:
             raise ValueError("Unsupported combination of loss and methods")
+
+    elif method_type == "separator":
+        if loss_fun == "square_loss":
+            constC1 = np.dot(
+                source_integrator.integrate_graph_field(p.reshape(-1, 1)),
+                np.ones(len(q)).reshape(1, -1),
+            )
+            constC2 = np.dot(
+                np.ones(len(p)).reshape(-1, 1),
+                target_integrator.integrate_graph_field(q.reshape(-1, 1)).T,
+            )
+
+        else:
+            raise NotImplementedError("KL div loss is not implemented")
+
+    else:
+        raise ValueError("Unsupported method type")
+
     constC = constC1 + constC2
 
     if method_type is None:
@@ -303,10 +330,10 @@ def gwggrad(
 
 
 def gw_lp(
-    C1,
-    C2,
-    p,
-    q,
+    C1=None,
+    C2=None,
+    p=None,
+    q=None,
     loss_fun="square_loss",
     alpha=1,
     armijo=True,
@@ -321,6 +348,15 @@ def gw_lp(
     target_lambda_par: float = None,
     num_rand_features: int = None,
     dim: int = None,
+    source_adjacency_lists=None,
+    source_weights_lists=None,
+    source_vertices=None,
+    source_unit_size=None,
+    threshold_nb_vertices=None,
+    target_adjacency_lists=None,
+    target_weights_lists=None,
+    target_vertices=None,
+    target_unit_size=None,
     verbose=False,
 ):
 
@@ -363,7 +399,7 @@ def gw_lp(
         If None the initial transport plan of the solver is pq^T.
         Otherwise G0 must satisfy marginal constraints and will be used as initial transport of the solver.
     The rest of the parameters are optional and only used for fast matrix vector multiplication.
-        method_type : Anything other than None defaults to fast matrix vector multiplication
+        method_type : Choose from [None, "diffusion", "separator"]
         source_positions : (n_s, dim) location of points in d-dim Euclidean space.
         target_positions : (n_t, dim) location of points in d-dim Euclidean space.
         source_epsilon : parameter that controls the epsilon neighbor of source points
@@ -391,7 +427,7 @@ def gw_lp(
         mathematics 11.4 (2011): 417-487.
     """
 
-    if method_type is not None:
+    if method_type == "diffusion":
         dfgf_s_integrator = DFGFIntegrator(
             source_positions,
             source_epsilon,
@@ -436,7 +472,8 @@ def gw_lp(
             )
         else:
             raise ValueError("incorrect loss function used")
-    else:
+
+    elif method_type is None:
         dfgf_s_integrator = None
         dfgf_t_integrator = None
         constC, hC1, hC2 = init_matrix(
@@ -449,6 +486,59 @@ def gw_lp(
             source_integrator=dfgf_s_integrator,
             target_integrator=dfgf_t_integrator,
         )
+
+    elif method_type == "separator":
+        if loss_fun == "square_loss":
+            f_fun_s = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_t = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_s_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            f_fun_t_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            dfgf_s_sq_integrator = SeparationGFIntegrator(
+                adjacency_lists=source_adjacency_lists,
+                weights_lists=source_weights_lists,
+                vertices=source_vertices,
+                f_fun=f_fun_s_sq,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_t_sq_integrator = SeparationGFIntegrator(
+                adjacency_lists=target_adjacency_lists,
+                weights_lists=target_weights_lists,
+                vertices=target_vertices,
+                f_fun=f_fun_t_sq,
+                unit_size=target_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_s_integrator = SeparationGFIntegrator(
+                adjacency_lists=source_adjacency_lists,
+                weights_lists=source_weights_lists,
+                vertices=source_vertices,
+                f_fun=f_fun_s,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_t_integrator = SeparationGFIntegrator(
+                adjacency_lists=target_adjacency_lists,
+                weights_lists=target_weights_lists,
+                vertices=target_vertices,
+                f_fun=f_fun_t,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            constC, hC1, hC2 = init_matrix(
+                C1,
+                C2,
+                p,
+                q,
+                loss_fun,
+                method_type=method_type,
+                source_integrator=dfgf_s_sq_integrator,
+                target_integrator=dfgf_t_sq_integrator,
+            )
+        else:
+            raise NotImplementedError("KL Div Loss is not implemented")
+    else:
+        raise ValueError("Unsupported method type")
 
     if method_type is None:
         M = np.zeros((C1.shape[0], C2.shape[0]))
@@ -522,6 +612,291 @@ def gw_lp(
             a=p,
             b=q,
             M=M,
+            reg=alpha,
+            f=f,
+            df=df,
+            G0=G0,
+            armijo=armijo,
+            C1=C1,
+            C2=C2,
+            constC=constC,
+            log=log,
+            alpha_min=0,
+            alpha_max=1,
+            method_type=method_type,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+            verbose=verbose,
+        )
+        return res
+
+
+def fgw_lp(
+    M,
+    C1=None,
+    C2=None,
+    p=None,
+    q=None,
+    loss_fun="square_loss",
+    alpha=1,
+    armijo=True,
+    G0=None,
+    log=True,
+    method_type=None,
+    source_positions=None,
+    target_positions: np.ndarray = None,
+    source_epsilon: float = None,
+    target_epsilon: float = None,
+    source_lambda_par: float = None,
+    target_lambda_par: float = None,
+    num_rand_features: int = None,
+    dim: int = None,
+    source_adjacency_lists=None,
+    source_weights_lists=None,
+    source_vertices=None,
+    source_unit_size=None,
+    threshold_nb_vertices=None,
+    target_adjacency_lists=None,
+    target_weights_lists=None,
+    target_vertices=None,
+    target_unit_size=None,
+    verbose=False,
+):
+    """
+    Computes the FGW distance between two graphs see [3]
+    .. math::
+        \gamma = arg\min_\gamma (1-\alpha)*<\gamma,M>_F + alpha* \sum_{i,j,k,l} L(C1_{i,k},C2_{j,l})*T_{i,j}*T_{k,l}
+        s.t. \gamma 1 = p
+             \gamma^T 1= q
+             \gamma\geq 0
+    where :
+    - M is the (ns,nt) metric cost matrix
+    - :math:`f` is the regularization term ( and df is its gradient)
+    - a and b are source and target weights (sum to 1)
+    The algorithm used for solving the problem is conditional gradient as discussed in  [1]_
+    Parameters
+    ----------
+    M  : ndarray, shape (ns, nt)
+         Metric cost matrix between features across domains
+    C1 : ndarray, shape (ns, ns)
+         Metric cost matrix respresentative of the structure in the source space
+    C2 : ndarray, shape (nt, nt)
+         Metric cost matrix espresentative of the structure in the target space
+    p :  ndarray, shape (ns,)
+         distribution in the source space
+    q :  ndarray, shape (nt,)
+         distribution in the target space
+    loss_fun :  string,optionnal
+        loss function used for the solver
+    max_iter : int, optional
+        Max number of iterations
+    tol : float, optional
+        Stop threshold on error (>0)
+    verbose : bool, optional
+        Print information along iterations
+    log : bool, optional
+        record log if True
+    armijo : bool, optional
+        If True the steps of the line-search is found via an armijo research. Else closed form is used.
+        If there is convergence issues use False.
+    The rest of the parameters are optional and only used for fast matrix vector multiplication.
+        method_type : Choose from [None, "diffusion", "separator"]
+        source_positions : (n_s, dim) location of points in d-dim Euclidean space.
+        target_positions : (n_t, dim) location of points in d-dim Euclidean space.
+        source_epsilon : parameter that controls the epsilon neighbor of source points
+        target_epsilon : parameter that controls the epsilon neighbor of target points
+        source_lambda_par : diffusion parameter for source graph.
+        target_lambda_par : diffusion parameter for target graph.
+        num_rand_features : Number of random features
+        dim : Input dimensionality of the data
+    verbose : bool, optional
+        If true returns logs/errors in each iteration
+    Returns
+    -------
+    gamma : (ns x nt) ndarray
+        Optimal transportation matrix for the given parameters
+    log : dict
+        log dictionary return only if log==True in parameters
+    References
+    ----------
+    .. [3] Vayer Titouan, Chapel Laetitia, Flamary R{\'e}mi, Tavenard Romain
+          and Courty Nicolas
+        "Optimal Transport for structured data with application on graphs"
+        International Conference on Machine Learning (ICML). 2019.
+    """
+
+    if method_type == "diffusion":
+        dfgf_s_integrator = DFGFIntegrator(
+            source_positions,
+            source_epsilon,
+            source_lambda_par,
+            num_rand_features,
+            dim,
+            random_projection_creator,
+            density_function,
+            fourier_transform,
+        )
+        dfgf_t_integrator = DFGFIntegrator(
+            target_positions,
+            target_epsilon,
+            target_lambda_par,
+            num_rand_features,
+            dim,
+            random_projection_creator,
+            density_function,
+            fourier_transform,
+        )
+        if loss_fun == "square_loss":
+            constC, hC1, hC2 = init_matrix(
+                C1,
+                C2,
+                p,
+                q,
+                loss_fun,
+                method_type=method_type,
+                source_integrator=dfgf_s_integrator,
+                target_integrator=dfgf_t_integrator,
+            )
+        elif loss_fun == "kl_loss":
+            constC, hC1, hC2 = init_matrix(
+                C1,
+                C2,
+                p,
+                q,
+                loss_fun,
+                method_type=method_type,
+                source_integrator=None,
+                target_integrator=dfgf_t_integrator,
+            )
+        else:
+            raise ValueError("incorrect loss function used")
+
+    elif method_type is None:
+        dfgf_s_integrator = None
+        dfgf_t_integrator = None
+        constC, hC1, hC2 = init_matrix(
+            C1,
+            C2,
+            p,
+            q,
+            loss_fun,
+            method_type=method_type,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+        )
+
+    elif method_type == "separator":
+        if loss_fun == "square_loss":
+            f_fun_s = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_t = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_s_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            f_fun_t_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            dfgf_s_sq_integrator = SeparationGFIntegrator(
+                adjacency_lists=source_adjacency_lists,
+                weights_lists=source_weights_lists,
+                vertices=source_vertices,
+                f_fun=f_fun_s_sq,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_t_sq_integrator = SeparationGFIntegrator(
+                adjacency_lists=target_adjacency_lists,
+                weights_lists=target_weights_lists,
+                vertices=target_vertices,
+                f_fun=f_fun_t_sq,
+                unit_size=target_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_s_integrator = SeparationGFIntegrator(
+                adjacency_lists=source_adjacency_lists,
+                weights_lists=source_weights_lists,
+                vertices=source_vertices,
+                f_fun=f_fun_s,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            dfgf_t_integrator = SeparationGFIntegrator(
+                adjacency_lists=target_adjacency_lists,
+                weights_lists=target_weights_lists,
+                vertices=target_vertices,
+                f_fun=f_fun_t,
+                unit_size=source_unit_size,
+                threshold_nb_vertices=threshold_nb_vertices,
+            )
+            constC, hC1, hC2 = init_matrix(
+                C1,
+                C2,
+                p,
+                q,
+                loss_fun,
+                method_type=method_type,
+                source_integrator=dfgf_s_sq_integrator,
+                target_integrator=dfgf_t_sq_integrator,
+            )
+        else:
+            raise NotImplementedError("KL Div Loss is not implemented")
+    else:
+        raise ValueError("Unsupported method type")
+
+    if G0 is None:
+        G0 = p[:, None] * q[None, :]
+    else:  # check marginals
+        np.testing.assert_allclose(G0.sum(axis=1), p, atol=1e-08)
+        np.testing.assert_allclose(G0.sum(axis=0), q, atol=1e-08)
+
+    def f(G):
+        return gwloss(
+            constC,
+            hC1,
+            hC2,
+            G,
+            method_type=method_type,
+            loss_fun=loss_fun,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+        )
+
+    def df(G):
+        return gwggrad(
+            constC,
+            hC1,
+            hC2,
+            G,
+            method_type=method_type,
+            loss_fun=loss_fun,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+        )
+
+    if log:
+        res, log0 = optimization.cg(
+            a=p,
+            b=q,
+            M=(1 - alpha) * M,
+            reg=alpha,
+            f=f,
+            df=df,
+            G0=G0,
+            armijo=armijo,
+            C1=C1,
+            C2=C2,
+            constC=constC,
+            log=log,
+            alpha_min=0,
+            alpha_max=1,
+            method_type=method_type,
+            source_integrator=dfgf_s_integrator,
+            target_integrator=dfgf_t_integrator,
+            verbose=verbose,
+        )
+        fgw_dist = log0['loss'][-1]
+        log0['fgw_dist'] = fgw_dist
+        return res, log0
+    else:
+        res = optimization.cg(
+            a=p,
+            b=q,
+            M=(1 - alpha) * M,
             reg=alpha,
             f=f,
             df=df,
