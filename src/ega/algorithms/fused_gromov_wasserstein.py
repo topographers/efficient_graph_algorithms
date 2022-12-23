@@ -358,6 +358,10 @@ def gw_lp(
     target_vertices=None,
     target_unit_size=None,
     verbose=False,
+    source_integrator=None,
+    target_integrator=None,
+    max_iter=1000,
+    stopThr=1e-9,
 ):
 
     """
@@ -428,26 +432,31 @@ def gw_lp(
     """
 
     if method_type == "diffusion":
-        dfgf_s_integrator = DFGFIntegrator(
-            source_positions,
-            source_epsilon,
-            source_lambda_par,
-            num_rand_features,
-            dim,
-            random_projection_creator,
-            density_function,
-            fourier_transform,
-        )
-        dfgf_t_integrator = DFGFIntegrator(
-            target_positions,
-            target_epsilon,
-            target_lambda_par,
-            num_rand_features,
-            dim,
-            random_projection_creator,
-            density_function,
-            fourier_transform,
-        )
+        if source_integrator is None and target_integrator is None:
+            dfgf_s_integrator = DFGFIntegrator(
+                source_positions,
+                source_epsilon,
+                source_lambda_par,
+                num_rand_features,
+                dim,
+                random_projection_creator,
+                density_function,
+                fourier_transform,
+            )
+            dfgf_t_integrator = DFGFIntegrator(
+                target_positions,
+                target_epsilon,
+                target_lambda_par,
+                num_rand_features,
+                dim,
+                random_projection_creator,
+                density_function,
+                fourier_transform,
+            )
+        else:
+            dfgf_s_integrator = source_integrator
+            dfgf_t_integrator = target_integrator
+
         if loss_fun == "square_loss":
             constC, hC1, hC2 = init_matrix(
                 C1,
@@ -595,6 +604,8 @@ def gw_lp(
             source_integrator=dfgf_s_integrator,
             target_integrator=dfgf_t_integrator,
             verbose=verbose,
+            numItermax=max_iter,
+            stopThr=stopThr,
         )
         log0["gw_dist"] = gwloss(
             constC,
@@ -627,6 +638,8 @@ def gw_lp(
             source_integrator=dfgf_s_integrator,
             target_integrator=dfgf_t_integrator,
             verbose=verbose,
+            numItermax=max_iter,
+            stopThr=stopThr,
         )
         return res
 
@@ -661,6 +674,10 @@ def fgw_lp(
     target_vertices=None,
     target_unit_size=None,
     verbose=False,
+    source_integrator=None,
+    target_integrator=None,
+    max_iter=1000,
+    stopThr=1e-9,
 ):
     """
     Computes the FGW distance between two graphs see [3]
@@ -726,26 +743,31 @@ def fgw_lp(
     """
 
     if method_type == "diffusion":
-        dfgf_s_integrator = DFGFIntegrator(
-            source_positions,
-            source_epsilon,
-            source_lambda_par,
-            num_rand_features,
-            dim,
-            random_projection_creator,
-            density_function,
-            fourier_transform,
-        )
-        dfgf_t_integrator = DFGFIntegrator(
-            target_positions,
-            target_epsilon,
-            target_lambda_par,
-            num_rand_features,
-            dim,
-            random_projection_creator,
-            density_function,
-            fourier_transform,
-        )
+        if source_integrator is None and target_integrator is None:
+            dfgf_s_integrator = DFGFIntegrator(
+                source_positions,
+                source_epsilon,
+                source_lambda_par,
+                num_rand_features,
+                dim,
+                random_projection_creator,
+                density_function,
+                fourier_transform,
+            )
+            dfgf_t_integrator = DFGFIntegrator(
+                target_positions,
+                target_epsilon,
+                target_lambda_par,
+                num_rand_features,
+                dim,
+                random_projection_creator,
+                density_function,
+                fourier_transform,
+            )
+        else:
+            dfgf_s_integrator = source_integrator
+            dfgf_t_integrator = target_integrator
+
         if loss_fun == "square_loss":
             constC, hC1, hC2 = init_matrix(
                 C1,
@@ -888,9 +910,11 @@ def fgw_lp(
             source_integrator=dfgf_s_integrator,
             target_integrator=dfgf_t_integrator,
             verbose=verbose,
+            numItermax=max_iter,
+            stopThr=stopThr,
         )
-        fgw_dist = log0['loss'][-1]
-        log0['fgw_dist'] = fgw_dist
+        fgw_dist = log0["loss"][-1]
+        log0["fgw_dist"] = fgw_dist
         return res, log0
     else:
         res = optimization.cg(
@@ -912,5 +936,514 @@ def fgw_lp(
             source_integrator=dfgf_s_integrator,
             target_integrator=dfgf_t_integrator,
             verbose=verbose,
+            numItermax=max_iter,
+            stopThr=stopThr,
         )
         return res
+
+
+def update_square_loss(p, lambdas, T, Cs, method_type):
+    """
+    Updates C according to the L2 Loss kernel with the S Ts couplings
+    calculated at each iteration
+    Parameters
+    ----------
+    p  : ndarray, shape (N,)
+         masses in the targeted barycenter
+    lambdas : list of float
+              list of the S spaces' weights
+    T : list of S np.ndarray(ns,N)
+        the S Ts couplings calculated at each iteration
+    Cs : list of S ndarray, shape(ns,ns)
+         Metric cost matrices
+    Returns
+    ----------
+    C : ndarray, shape (nt,nt)
+        updated C matrix
+    """
+    if method_type is None:
+        tmpsum = sum(
+            [lambdas[s] * np.dot(np.dot(T[s].T, Cs[s]), T[s]) for s in range(len(T))]
+        )
+    else:
+        tmpsum = sum(
+            [
+                lambdas[s] * np.dot(T[s].T, Cs[s].integrate_graph_field(T[s]))
+                for s in range(len(T))
+            ]
+        )
+    ppt = np.outer(p, p)
+
+    return tmpsum / ppt
+
+
+def update_kl_loss(p, lambdas, T, Cs, method_type):
+    r"""
+    Updates :math:`\mathbf{C}` according to the KL Loss kernel with the `S` :math:`\mathbf{T}_s` couplings calculated at each iteration
+    Parameters
+    ----------
+    p  : array-like, shape (N,)
+        Weights in the targeted barycenter.
+    lambdas : list of float
+        List of the `S` spaces' weights
+    T : list of S array-like of shape (ns,N)
+        The `S` :math:`\mathbf{T}_s` couplings calculated at each iteration.
+    Cs : list of S array-like, shape(ns,ns)
+        Metric cost matrices.
+    Returns
+    ----------
+    C : array-like, shape (`ns`, `ns`)
+        updated :math:`\mathbf{C}` matrix
+    """
+    if method_type is None:
+        tmpsum = sum(
+            [lambdas[s] * np.dot(np.dot(T[s].T, Cs[s]), T[s]) for s in range(len(T))]
+        )
+    else:
+        raise NotImplementedError("KL loss is not implemented using fast variants.")
+    ppt = np.outer(p, p)
+
+    return np.exp(tmpsum / ppt)
+
+
+def update_cross_feature_matrix(X, Y):
+
+    """
+    Updates M the distance matrix between the features
+    calculated at each iteration
+    ----------
+    X : ndarray, shape (N,d)
+        First features matrix, N: number of samples, d: dimension of the features
+    Y : ndarray, shape (M,d)
+        Second features matrix, N: number of samples, d: dimension of the features
+    Returns
+    ----------
+    M : ndarray, shape (N,M)
+    """
+
+    return ot.dist(reshaper(np.array(X)), reshaper(np.array(Y)))
+
+
+def update_Ms(X, Ys):
+
+    l = [update_cross_feature_matrix(X, Ys[s]) for s in range(len(Ys))]
+
+    return l
+
+
+def update_feature_matrix(lambdas, Ys, Ts, p):
+
+    """
+    Updates the feature with respect to the S Ts couplings. See "Solving the barycenter problem with Block Coordinate Descent (BCD)" in [3]
+    calculated at each iteration
+    Parameters
+    ----------
+    p  : ndarray, shape (N,)
+         masses in the targeted barycenter
+    lambdas : list of float
+              list of the S spaces' weights
+    Ts : list of S np.ndarray(ns,N)
+        the S Ts couplings calculated at each iteration
+    Ys : list of S ndarray, shape(d,ns)
+         The features
+    Returns
+    ----------
+    X : ndarray, shape (d,N)
+    References
+    ----------
+    .. [3] Vayer Titouan, Chapel Laetitia, Flamary R{\'e}mi, Tavenard Romain
+          and Courty Nicolas
+        "Optimal Transport for structured data with application on graphs"
+        International Conference on Machine Learning (ICML). 2019.
+    """
+
+    p = np.diag(
+        np.array(1 / p).reshape(
+            -1,
+        )
+    )
+
+    tmpsum = tmpsum = sum(
+        [lambdas[s] * np.dot(Ys[s], Ts[s].T) * p[None, :] for s in range(len(Ts))]
+    )
+
+    return tmpsum
+
+
+def gw_barycenters(
+    N,
+    Cs,
+    ps,
+    q,
+    lambdas,
+    loss_fun,
+    max_iter=1000,
+    tol=1e-9,
+    verbose=False,
+    log=False,
+    init_C=None,
+    random_state=None,
+    alpha=0.5,
+    armijo=True,
+    method_type="diffusion",
+    integrators=None,
+    bary_epsilon=None,
+    bary_lambda_par=None,
+    bary_rand_feats=None,
+):
+    if Cs is not None:
+        S = len(Cs)
+    else:
+        S = len(integrators)
+
+    # Initialization of C : random SPD matrix (if not provided by user)
+    if method_type is None:
+        if init_C is None:
+            np.random.seed(random_state)
+            xalea = np.random.rand(N, 2)
+            C = sp.spatial.distance.cdist(xalea, xalea, "minkowski", p=1)
+            C /= C.max()
+        else:
+            C = init_C
+    elif method_type == "diffusion":
+        np.random.seed(random_state)
+        xalea = np.random.rand(N, 2)
+        xalea_integrator = DFGFIntegrator(
+            positions=xalea,
+            epsilon=bary_epsilon,
+            lambda_par=bary_lambda_par,
+            num_rand_features=bary_rand_feats,
+            dim=2,
+            random_projection_creator=random_projection_creator,
+            density_function=density_function,
+            fourier_transform=fourier_transform,
+        )
+    else:
+        raise NotImplementedError("KL div and other losses are not implemented")
+
+    cpt = 0
+    err = 1
+
+    error = []
+
+    while err > tol and cpt < max_iter:
+        if method_type is None:
+            Cprev = C
+        else:
+            C = np.identity(N, dtype=float)
+            Cprev = C
+
+        if method_type is None:
+            T = [
+                gw_lp(
+                    Cs[s],
+                    C,
+                    ps[s],
+                    q,
+                    loss_fun,
+                    max_iter=max_iter,
+                    log=False,
+                    armijo=armijo,
+                    alpha=alpha,
+                    method_type=method_type,
+                )
+                for s in range(S)
+            ]
+        elif method_type == "diffusion":
+            T = [
+                gw_lp(
+                    C1=None,
+                    C2=None,
+                    p=ps[s],
+                    q=q,
+                    loss_fun=loss_fun,
+                    alpha=alpha,
+                    armijo=True,
+                    G0=None,
+                    log=False,
+                    method_type=method_type,
+                    max_iter=max_iter,
+                    source_integrator=integrators[s],
+                    target_integrator=xalea_integrator,
+                )
+                for s in range(S)
+            ]
+        else:
+            raise NotImplementedError("KL loss is not yet implemented")
+
+        if method_type is None:
+            if loss_fun == "square_loss":
+                C = update_square_loss(q, lambdas, T, Cs, method_type)
+
+            elif loss_fun == "kl_loss":
+                C = update_kl_loss(q, lambdas, T, Cs, method_type)
+
+        elif method_type == "diffusion":
+            if loss_fun == "square_loss":
+                C = update_square_loss(q, lambdas, T, integrators, method_type)
+
+            elif loss_fun == "kl_loss":
+                raise NotImplementedError("KL loss is not supported yet")
+
+        else:
+            raise NotImplementedError("Other FM method is not supported yet")
+
+        if cpt % 10 == 0:
+            # we can speed up the process by checking for the error only all
+            # the 10th iterations
+            err = np.linalg.norm(C - Cprev)
+            error.append(err)
+
+            if verbose:
+                if cpt % 200 == 0:
+                    print("{:5s}|{:12s}".format("It.", "Err") + "\n" + "-" * 19)
+                print("{:5d}|{:8e}|".format(cpt, err))
+
+        cpt += 1
+
+    if log:
+        return C, {"err": error}
+    else:
+        return C
+
+
+def fgw_barycenters(
+    N,
+    Ys,
+    Cs,
+    ps,
+    lambdas,
+    alpha,
+    fixed_structure=False,
+    fixed_features=False,
+    p=None,
+    loss_fun="square_loss",
+    max_iter=1000,
+    tol=1e-9,
+    verbose=False,
+    random_seed=42,
+    log=False,
+    init_C=None,
+    init_X=None,
+    armijo=True,
+    integrators=None,
+    method_type=None,
+    bary_epsilon=None,
+    bary_lambda_par=None,
+    bary_rand_feats=None,
+):
+    """
+    Compute the fgw barycenter as presented eq (5) in [3].
+    ----------
+    N : integer
+        Desired number of samples of the target barycenter
+    Ys: list of ndarray, each element has shape (ns,d)
+        Features of all samples
+    Cs : list of ndarray, each element has shape (ns,ns)
+         Structure matrices of all samples
+    ps : list of ndarray, each element has shape (ns,)
+        masses of all samples
+    lambdas : list of float
+              list of the S spaces' weights
+    alpha : float
+            Alpha parameter for the fgw distance
+    fixed_structure :  bool
+                       Wether to fix the structure of the barycenter during the updates
+    fixed_features :  bool
+                       Wether to fix the feature of the barycenter during the updates
+    init_C :  ndarray, shape (N,N), optional
+              initialization for the barycenters' structure matrix. If not set random init
+    init_X :  ndarray, shape (N,d), optional
+              initialization for the barycenters' features. If not set random init
+    Returns
+    ----------
+    X : ndarray, shape (N,d)
+        Barycenters' features
+    C : ndarray, shape (N,N)
+        Barycenters' structure matrix
+    log_:
+        T : list of (N,ns) transport matrices
+        Ms : all distance matrices between the feature of the barycenter and the other features dist(X,Ys) shape (N,ns)
+    References
+    ----------
+    .. [3] Vayer Titouan, Chapel Laetitia, Flamary R{\'e}mi, Tavenard Romain
+          and Courty Nicolas
+        "Optimal Transport for structured data with application on graphs"
+        International Conference on Machine Learning (ICML). 2019.
+    """
+    np.random.seed(random_seed)
+
+    if Cs is not None:
+        S = len(Cs)
+    else:
+        S = len(integrators)
+
+    d = reshaper(Ys[0]).shape[1]  # dimension on the node features
+    if p is None:
+        p = np.ones(N) / N
+
+    if fixed_structure:
+        if init_C is None:
+            raise ValueError("If C is fixed it must be initialized")
+        else:
+            C = init_C
+    else:
+        if init_C is None and method_type is None:
+            xalea = np.random.randn(N, 2)
+            C = dist(xalea, xalea)
+            C /= C.max()
+        elif method_type == "diffusion" and init_C is None:
+            np.random.seed(random_seed)
+            xalea = np.random.rand(N, 2)
+            xalea_integrator = DFGFIntegrator(
+                positions=xalea,
+                epsilon=bary_epsilon,
+                lambda_par=bary_lambda_par,
+                num_rand_features=bary_rand_feats,
+                dim=2,
+                random_projection_creator=random_projection_creator,
+                density_function=density_function,
+                fourier_transform=fourier_transform,
+            )
+        elif method_type == "separator" and init_C is None:
+            raise NotImplementedError("Separator is not implemented yet")
+        else:
+            C = init_C
+
+    if fixed_features:
+        if init_X is None:
+            raise ValueError("If X is fixed it must be initialized")
+        else:
+            X = init_X
+    else:
+        if init_X is None:
+            X = np.zeros((N, d))
+        else:
+            X = init_X
+
+    T = [np.outer(p, q) for q in ps]  # aligning with POT code
+    # T=[random_gamma_init(p,q) for q in ps]
+
+    # X is N,d
+    # Ys is ns,d
+    Ms = update_Ms(X, Ys)
+    # Ms is N,ns
+
+    cpt = 0
+    err_feature = 1
+    err_structure = 1
+
+    if log:
+        log_ = {}
+        log_["err_feature"] = []
+        log_["err_structure"] = []
+        log_["Ts_iter"] = []
+
+    while (err_feature > tol or err_structure > tol) and cpt < max_iter:
+        if method_type is None:
+            Cprev = C
+        else:
+            C = np.identity(N, dtype=float)
+            Cprev = C
+
+        Xprev = X
+
+        if not fixed_features:
+            Ys_temp = [reshaper(y).T for y in Ys]
+            X = update_feature_matrix(lambdas, Ys_temp, T, p)
+
+        # X must be N,d
+        # Ys must be ns,d
+        Ms = update_Ms(X.T, Ys)
+
+        if not fixed_structure:
+            if loss_fun == "square_loss":
+                # T must be ns,N
+                # Cs must be ns,ns
+                # p must be N,1
+                T_temp = [t.T for t in T]
+                if method_type is None:
+                    C = update_square_loss(p, lambdas, T_temp, Cs, method_type)
+                elif method_type == "diffusion":
+                    C = update_square_loss(p, lambdas, T_temp, integrators, method_type)
+                else:
+                    raise NotImplementedError("Other methods are not implemented")
+
+        # Ys must be d,ns
+        # Ts must be N,ns
+        # p must be N,1
+        # Ms is N,ns
+        # C is N,N
+        # Cs is ns,ns
+        # p is N,1
+        # ps is ns,1
+        if method_type is None:
+            T = [
+                fgw_lp(
+                    Ms[s],
+                    C,
+                    Cs[s],
+                    p,
+                    ps[s],
+                    loss_fun,
+                    alpha,
+                    max_iter=max_iter,
+                    verbose=verbose,
+                    armijo=armijo,
+                    log=False,
+                )
+                for s in range(S)
+            ]
+        elif method_type == "diffusion":
+            T = [
+                fgw_lp(
+                    Ms[s],
+                    C1=None,
+                    C2=None,
+                    p=p,
+                    q=ps[s],
+                    loss_fun=loss_fun,
+                    alpha=alpha,
+                    armijo=armijo,
+                    log=False,
+                    method_type=method_type,
+                    source_positions=None,
+                    target_positions=None,
+                    source_epsilon=None,
+                    target_epsilon=None,
+                    source_lambda_par=None,
+                    target_lambda_par=None,
+                    num_rand_features=None,
+                    dim=None,
+                    source_integrator=xalea_integrator,
+                    target_integrator=integrator[s],
+                )
+                for s in range(S)
+            ]
+
+        # T is N,ns
+
+        err_feature = np.linalg.norm(X - Xprev.reshape(d, N))  # TODO:CHECK
+        err_structure = np.linalg.norm(C - Cprev)
+
+        if log:
+            log_["err_feature"].append(err_feature)
+            log_["err_structure"].append(err_structure)
+            log_["Ts_iter"].append(T)
+
+        if verbose:
+            if cpt % 200 == 0:
+                print("{:5s}|{:12s}".format("It.", "Err") + "\n" + "-" * 19)
+            print("{:5d}|{:8e}|".format(cpt, err_structure))
+            print("{:5d}|{:8e}|".format(cpt, err_feature))
+
+        cpt += 1
+    if log:
+        log_["T"] = T  # ce sont les matrices du barycentre de la target vers les Ys
+        log_["p"] = p
+        log_["Ms"] = Ms  # Ms sont de tailles N,ns
+
+    if log:
+        return X.T, C, log_
+    else:
+        return X.T, C
