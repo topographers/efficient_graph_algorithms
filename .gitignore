@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+__pycache__
+*/__pycache__/*
+
+
 # C extensions
 *.so
 

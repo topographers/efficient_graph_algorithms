@@ -2,11 +2,7 @@
 # https://github.com/tvayer/FGW
 
 import numpy as np
-import ot
-import optimization
-from ega.util.wasserstein_utils import dist, reshaper
-from scipy import stats
-from scipy.sparse import random
+import ega.algorithms.optimization
 from ega.algorithms.graph_diffusion_gf_integrator import DFGFIntegrator
 from ega.algorithms.separation_gf_integrator import SeparationGFIntegrator
 from ega.util.mesh_utils import (
@@ -585,7 +581,7 @@ def gw_lp(
         )
 
     if log:
-        res, log0 = optimization.cg(
+        res, log0 = ega.algorithms.optimization.cg(
             a=p,
             b=q,
             M=M,
@@ -619,7 +615,7 @@ def gw_lp(
         )
         return res, log0
     else:
-        res = optimization.cg(
+        res = ega.algorithms.optimization.cg(
             a=p,
             b=q,
             M=M,
@@ -891,7 +887,7 @@ def fgw_lp(
         )
 
     if log:
-        res, log0 = optimization.cg(
+        res, log0 = ega.algorithms.optimization.cg(
             a=p,
             b=q,
             M=(1 - alpha) * M,
@@ -917,7 +913,7 @@ def fgw_lp(
         log0["fgw_dist"] = fgw_dist
         return res, log0
     else:
-        res = optimization.cg(
+        res = ega.algorithms.optimization.cg(
             a=p,
             b=q,
             M=(1 - alpha) * M,
