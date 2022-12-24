@@ -37,8 +37,11 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
         """
         Sample a random spanning tree
         """
-        # get random spanning tree
-        T = nx.random_spanning_tree(self._G)
+        if self._num_trees == 1:
+            T = nx.minimum_spanning_tree(self._G)
+        else:
+            # get random spanning tree
+            T = nx.random_spanning_tree(self._G)
         A_T = self._adjacency_lists_nx(T)
         tadj_lists, tw_lists = self._get_adjacency_lists_from_A(A_T)
         # convert it into our data structure format

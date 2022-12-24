@@ -4,7 +4,6 @@ import networkx as nx
 
 from ega.algorithms.brute_force import BFGFIntegrator
 from ega.algorithms.bartal_trees import BartalTreeGFIntegrator
-from ega.util.gaussian_kernel import GaussianKernel
 
 
 def get_adjacency_lists_from_A(A):
@@ -34,6 +33,13 @@ def get_rel_diff(a, b=None):
     else: ord = 'fro'
     return np.linalg.norm(a-b, ord=ord) / min(np.linalg.norm(a, ord=ord), np.linalg.norm(b, ord=ord))
 
+def print_subopt_ratios(dist_T, dist_G):
+    n = dist_T.shape[0]
+    ratios =  np.divide(dist_T, dist_G + np.eye(n))
+    ratios = ratios[np.ones(dist_T.shape) - np.eye(n) == 1]
+    prob, vals = np.histogram(ratios, 5, density=True)
+    print(f"{prob = }")
+    print(f"{vals = }, {ratios.min() = }, {ratios.max() = }")
 
 def main():
     # GENERAL PARAMETERS
@@ -56,7 +62,7 @@ def main():
     # Geometric random graph
     print("Geometric random graph")
     positions = np.random.rand(n, 3)
-    r = 0.65
+    r = 0.45
     A = np.zeros((n,n))
     for i in range(n):
         for j in range(i+1, n):
@@ -122,8 +128,7 @@ def main():
 
     # --------------- TESTING Bartal trees ---------------
 
-    for graph_type in graphs.keys():
-        print(f"{graph_type = }")    
+    for graph_type in graphs.keys():  
         adjacency_lists, weights_lists = graphs[graph_type]
         num_trees = 1
         bartal_trees = BartalTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
@@ -147,25 +152,23 @@ def main():
         num_trees = 20
         bartal_trees = BartalTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
         dist_G = bartal_trees._dist_G
-        print("Averaging trees: histogram for distortions of distances")
+
+        print("Averaging trees: histogram for suboptimality ratio")
         dist_T = np.zeros((n,n))
         for i in range(bartal_trees._num_trees):
             tadj_lists, tw_lists = bartal_trees._trees[i]['adj'], bartal_trees._trees[i]['w']
             dist_Ti = bartal_trees._distance_matrix(tadj_lists, tw_lists)
             dist_T  += dist_Ti
         dist_T /= bartal_trees._num_trees
-        ratios =  np.divide(dist_T, dist_G + np.eye(n))
-        ratios = ratios - np.diag(np.diag(ratios))
-        print(np.histogram(ratios.reshape(-1), 5, density=True))
-        print("Minimum over trees: histogram for distortions of distances")
+        print_subopt_ratios(dist_T, dist_G)
+
+        print("Minimum over trees: histogram for suboptimality ratio")
         min_dist_T = np.inf * np.ones((n,n))
         for i in range(bartal_trees._num_trees):
             tadj_lists, tw_lists = bartal_trees._trees[i]['adj'], bartal_trees._trees[i]['w']
             dist_Ti = bartal_trees._distance_matrix(tadj_lists, tw_lists)
             min_dist_T = np.minimum(min_dist_T, dist_Ti)
-        ratios =  np.divide(min_dist_T, dist_G + np.eye(n))
-        ratios = ratios - np.diag(np.diag(ratios))
-        print(np.histogram(ratios.reshape(-1), 5, density=True))
+        print_subopt_ratios(min_dist_T, dist_G)
 
 
 if __name__ == '__main__':
