@@ -1002,7 +1002,7 @@ def update_kl_loss(p, lambdas, T, Cs, method_type):
     return np.exp(tmpsum / ppt)
 
 
-def update_cross_feature_matrix(X, Y):
+def update_cross_feature_matrix(X, Y, metric="sqeuclidean", p=2, w=None):
 
     """
     Updates M the distance matrix between the features
@@ -1017,12 +1017,21 @@ def update_cross_feature_matrix(X, Y):
     M : ndarray, shape (N,M)
     """
 
-    return ot.dist(reshaper(np.array(X)), reshaper(np.array(Y)))
+    if metric == "dirac":
+        f = lambda x, y: x != y
+        return cdist(X, Y, metric=f)
+    elif metric == "hamming":
+        raise ValueError("Hammming will produce worng results. Do not use.")
+    else:
+        return ot.dist(X, Y, metric=metric, p=p, w=w)
 
 
-def update_Ms(X, Ys):
+def update_Ms(X, Ys, metric, p, w):
 
-    l = [update_cross_feature_matrix(X, Ys[s]) for s in range(len(Ys))]
+    l = [
+        update_cross_feature_matrix(X, Ys[s], metric=metric, p=p, w=w)
+        for s in range(len(Ys))
+    ]
 
     return l
 
@@ -1053,13 +1062,8 @@ def update_feature_matrix(lambdas, Ys, Ts, p):
         International Conference on Machine Learning (ICML). 2019.
     """
 
-    p = np.diag(
-        np.array(1 / p).reshape(
-            -1,
-        )
-    )
-
-    tmpsum = tmpsum = sum(
+    p = 1.0 / p
+    tmpsum = sum(
         [lambdas[s] * np.dot(Ys[s], Ts[s].T) * p[None, :] for s in range(len(Ts))]
     )
 
@@ -1154,7 +1158,7 @@ def gw_barycenters(
                     q=q,
                     loss_fun=loss_fun,
                     alpha=alpha,
-                    armijo=True,
+                    armijo=armijo,
                     G0=None,
                     log=False,
                     method_type=method_type,
@@ -1227,6 +1231,9 @@ def fgw_barycenters(
     bary_epsilon=None,
     bary_lambda_par=None,
     bary_rand_feats=None,
+    metric="dirac",
+    p_norm=None,
+    w=None,
 ):
     """
     Compute the fgw barycenter as presented eq (5) in [3].
@@ -1251,6 +1258,13 @@ def fgw_barycenters(
               initialization for the barycenters' structure matrix. If not set random init
     init_X :  ndarray, shape (N,d), optional
               initialization for the barycenters' features. If not set random init
+    metric : str | callable, optional
+        'sqeuclidean' or 'euclidean' on all backends. On numpy the function also
+        accepts  from the scipy.spatial.distance.cdist function : 'braycurtis',
+        'canberra', 'chebyshev', 'cityblock', 'correlation', 'cosine', 'dice',
+        'euclidean', 'hamming', 'jaccard', 'kulsinski', 'mahalanobis',
+        'matching', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean',
+        'sokalmichener', 'sokalsneath', 'sqeuclidean', 'wminkowski', 'yule'.
     Returns
     ----------
     X : ndarray, shape (N,d)
@@ -1286,7 +1300,7 @@ def fgw_barycenters(
     else:
         if init_C is None and method_type is None:
             xalea = np.random.randn(N, 2)
-            C = dist(xalea, xalea)
+            C = ot.dist(xalea, xalea)
             C /= C.max()
         elif method_type == "diffusion" and init_C is None:
             np.random.seed(random_seed)
@@ -1322,7 +1336,7 @@ def fgw_barycenters(
 
     # X is N,d
     # Ys is ns,d
-    Ms = update_Ms(X, Ys)
+    Ms = update_Ms(X, Ys, metric=metric, p=p_norm, w=w)
     # Ms is N,ns
 
     cpt = 0
@@ -1345,12 +1359,12 @@ def fgw_barycenters(
         Xprev = X
 
         if not fixed_features:
-            Ys_temp = [reshaper(y).T for y in Ys]
+            Ys_temp = [y.T for y in Ys]
             X = update_feature_matrix(lambdas, Ys_temp, T, p)
 
         # X must be N,d
         # Ys must be ns,d
-        Ms = update_Ms(X.T, Ys)
+        Ms = update_Ms(X.T, Ys, metric=metric, p=p_norm, w=w)
 
         if not fixed_structure:
             if loss_fun == "square_loss":
@@ -1412,14 +1426,16 @@ def fgw_barycenters(
                     num_rand_features=None,
                     dim=None,
                     source_integrator=xalea_integrator,
-                    target_integrator=integrator[s],
+                    target_integrator=integrators[s],
                 )
                 for s in range(S)
             ]
 
         # T is N,ns
-
-        err_feature = np.linalg.norm(X - Xprev.reshape(d, N))  # TODO:CHECK
+        if X.shape != Xprev.shape:
+            err_feature = np.linalg.norm(X - Xprev.reshape(d, N))  # hack
+        else:
+            err_feature = np.linalg.norm(X - Xprev)
         err_structure = np.linalg.norm(C - Cprev)
 
         if log:
