@@ -68,7 +68,7 @@ def main():
     print("Constructor for Bartal trees (BT) takes time: ", end - start)
     start = time.time()
     num_trees = 30
-    spanning_trees = BartalTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
+    spanning_trees = SpanningTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
                                                     f_fun, num_trees=1)
     end = time.time()
     print("Constructor for Spanning trees (ST) takes time: ", end - start)
