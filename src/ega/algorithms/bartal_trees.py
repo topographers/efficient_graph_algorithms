@@ -1,13 +1,10 @@
 import numpy as np 
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import shortest_path
 
-from ega.algorithms.gf_integrator import GFIntegrator
-from tqdm import tqdm 
+from ega.algorithms.trees import TreeGFIntegrator
 import random
 
 
-class BartalTreeGFIntegrator(GFIntegrator):
+class BartalTreeGFIntegrator(TreeGFIntegrator):
     """
     The class for fast exact multiplication of the distance-based matrix
     M_ab \in R ^ {N * N} defined as (M_ab)_ij = \sum_Tk exp(a*dist_Tk(i,j)+b), 
@@ -27,42 +24,92 @@ class BartalTreeGFIntegrator(GFIntegrator):
     f_fun(x)=exp(ax), ie, is exponential function.
     """
     def __init__(self, adjacency_lists, weights_lists, vertices, f_fun, num_trees=None):
-        super().__init__(adjacency_lists, weights_lists, vertices, f_fun)
-        self.n = len(vertices)
-        if  num_trees is None: self._num_trees = int(np.log2(self.n)) + 1
-        else: self._num_trees = num_trees
-        # construct Bartal trees
-        self._trees  = []
-        # minimum edge weight
-        self._min_w = min([w for w_list in weights_lists for w in w_list])
-        self._dist_G = self._distance_matrix(adjacency_lists, weights_lists)
-        self._diam = self._dist_G.max()
+        super().__init__(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
         
-        for i in range(num_trees):
-            self._trees[i] = self._sample_Bartal_tree()
-        
-
-    def integrate_graph_field(self, field):
-        res = 0
-        for tree in self._trees:
-            res += self._matvec_dynamic_programming(tree, field)
-        return res / self._num_trees
+        for i in range(self._num_trees):
+            self._trees[i] = self._sample_tree()
 
 
-    def _sample_Bartal_tree(self):
+    def _sample_tree(self):
         # node2idx, idx2node
-        pass
+        cluster = list(range(self.n))
+        diam = self._diam
+        tree = self._bartal_tree(cluster, diam)
+        # permute indices of adjacency list according to node2idx mapping
+        root = tree['root']
+        tadj_lists = [[] for _ in range(self.n)]
+        tw_lists = [[] for _ in range(self.n)]
+        for node, node_idx in tree['node2idx'].items():
+            tadj_lists[node] = tree['adj'][node_idx]
+            tw_lists[node] = tree['w'][node_idx]
+        levels, parents = self._tree_root2leaf_levels_parents(root, tadj_lists)
+        return {'root':root, 'parents':parents, 'adj':tadj_lists,  'w':tw_lists, 'levels':levels}
+
+    
+    def _bartal_tree(self, cluster, diam):
+        """
+        Bartal tree in the dictionary format
+        tree = dict()
+                'root':root_node, 
+                'adj':t_adj_lists
+                    mapping of node_index to the list of adjacent  nodes
+                'w':t_w_lists
+                    mapping of node_index to the list of weights of adjacent nodes
+                'node2idx': dict()
+                    mapping of nodes to indices in the 'adj' list
+        """
+        if len(cluster) == 1:
+            root = cluster[0]
+            tree = {'root':root, 'adj':[[]],  'w':[[]], 'node2idx':{cluster[0]:0}}
+            return tree
+
+        new_clusters = self._low_diameter_decomposition(cluster, diam / 2)
+        trees = [0]*len(new_clusters)
+        for cl_idx, cluster_i in enumerate(new_clusters):
+            trees[cl_idx] = self._bartal_tree(cluster_i, diam / 2)
+
+        return self._merge_trees(trees, diam)
 
 
+    def _merge_trees(self, trees, w):
+        """
+        Merge trees by their roots using weight w
+        Use node2idx lists to merge adjacency_lists and weights_lists properly
+        """
+        tree = trees[0]
+        root = tree['root']
+        root_idx = tree['node2idx'][root]
+        count = len(tree['node2idx'])
+        for tree_i in trees[1:]:
+            tree['adj'] += tree_i['adj']
+            tree['w'] += tree_i['w']
+            for node, node_idx in tree_i['node2idx'].items():
+                tree['node2idx'][node] = node_idx + count
+            # connect root with root_i using weight w
+            root_i = tree_i['root']
+            root_i_idx = tree['node2idx'][root_i]
+            tree['adj'][root_idx] += [root_i]
+            tree['w'][root_idx] += [w]
+            tree['adj'][root_i_idx] += [root]
+            tree['w'][root_i_idx] += [w]
+
+            count += len(tree_i['node2idx'])
+        
+        return tree 
+
+    
     def _low_diameter_decomposition(self, cluster, diam):
+        """
+        Decompose current cluster into lower diameter clusters
+        """
         if len(cluster) == 1: return [cluster]
         p = min(1, (4*np.log2(self.n))  / (diam / self._min_w))
         clusters = []
         unsampled_nodes = set(cluster)
         while len(unsampled_nodes) > 0:
-            center = random.sample(unsampled_nodes)
+            center = random.sample(unsampled_nodes, 1)[0]
             R = np.random.geometric(p=p) * self._min_w
-            # obtain shortest path ball fom center node with radius <= R
+            # obtain shortest path ball fom center node with radius < R
             # over unsampled nodes only
             new_cluster = self._shortest_path_ball(center, R, unsampled_nodes)
             clusters += [new_cluster]
@@ -70,74 +117,28 @@ class BartalTreeGFIntegrator(GFIntegrator):
         return clusters
 
 
-    def _distance_matrix(self, adjacency_lists, weights_lists):
-        n = len(adjacency_lists)
-        edges = np.zeros((n, n))
-        for i in range(n):
-            for j_idx, j in enumerate(adjacency_lists[i]):
-                w = weights_lists[i][j_idx]
-                edges[i,j] = w
-                edges[j,i] = w
-        csr_adjacency = csr_matrix(edges)
-        dist_G = shortest_path(csgraph=csr_adjacency, directed=False)
-        return  dist_G
-
-
-    def _tree_root2leaf_levels_parents(self, root, tadj_lists):
+    def _shortest_path_ball(self, center, R, unsampled_nodes):
         """
-        Given tree adjacency lists and a root, build levels of the tree
-        and list of parents for each node
+        Return a cluster (connected component) from unsampled_nodes 
+        centered at node center with radius < R.
+        Specifically, grow a shortest path ball from center node over the 
+        unsampled nodes with radius < R.
         """
-        n = len(tadj_lists)
-        parents = [0]*n
-        parents[root] = None
-        levels = [[root]]
-
-        # top-down traversal of a tree
-        previous_level = levels[0]
-        while previous_level != []:
-            levels += [[]]
-            for node in previous_level:
-                for child_node in tadj_lists[node]:
-                        if child_node == parents[node]: continue
-                        parents[child_node] = node
-                        levels[-1] += [child_node]
-            previous_level = levels[-1]
-        # if debug:
-        #     assert set(range(n)) == set([node for level in levels for node in level])
-        return levels[:-1], parents
-
-
-    def _matvec_dynamic_programming(self, tree, field):
-        """
-        Compute matrix field product using dynamic programming,
-        assuming that
-                    f_fun(x) = exp(ax), exponential function
-        tree = dict()
-                'root':root_node, 
-                'adj':t_adj_lists, 
-                'w':t_w_lists, 
-                'parents': list with parent nodes,
-                'levels':list with nodes on each level of the tree
-        """
-        # bottom-up traversal
-        partial_sums = np.zeros(field.shape)
-        for level in reversed(tree['levels']):
-            for node in level:
-                partial_sums[node] += field[node]
-                for idx_child_node, child_node in enumerate(tree['adj'][node]):
-                    if child_node == tree['parents'][node]: continue
-                    w = tree['w'][node][idx_child_node]
-                    partial_sums[node] += self._f_fun(w)*partial_sums[child_node]
-                
-        # top-down traversal
-        sums = np.zeros(field.shape)
-        sums[tree['root']] = partial_sums[tree['root']]
-        for level in tree['levels']:
-            for node in level:
-                for idx_child_node, child_node in enumerate(tree['adj'][node]):
-                    if child_node == tree['parents'][node]: continue
-                    w = tree['w'][node][idx_child_node]
-                    sums[child_node] = self._f_fun(w) * sums[node] + \
-                                            (1 - self._f_fun(2*w)) * partial_sums[child_node]
-        return sums
+        cluster = [center]
+        visited = np.zeros(self.n)
+        candidates = [center] # candidates to be added to a cluster
+        while len(candidates) >= 1:
+            next_candidates = []
+            for ni in candidates:
+                if visited[ni] == 1: continue
+                visited[ni] = 1
+                for nj in self._adjacency_lists[ni]:
+                    # check if nj is inside the ball(center, R)
+                    if (nj not in unsampled_nodes) or (self._dist_G[center, nj] >= R) or \
+                                                    (visited[nj] == 1): 
+                        visited[nj] = 1
+                        continue
+                    cluster += [nj]
+                    next_candidates += [nj]
+            candidates = next_candidates
+        return list(set(cluster))
