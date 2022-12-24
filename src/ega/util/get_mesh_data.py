@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse as sps
 import scipy.linalg as splinalg
+from sksparse.cholmod import cholesky
 
 def cotangent_laplacian(vertices: float, faces: int):
     # Find orig edge lengths and angles
@@ -73,13 +74,26 @@ def cotangent_laplacian(vertices: float, faces: int):
     area_weights = area_weights / np.sum(area_weights)
     return cot_laplacian, area_weights
 
-def get_mesh_data(vertices: float, faces: int, num_eigs=10):
+def get_mesh_data(vertices: float, faces: int, time: float, steps: int, sparse: bool):
     mesh_dictionary = {}
     mesh_dictionary['vertices'] = vertices
     mesh_dictionary['faces'] = faces
     mesh_dictionary['cot_laplacian'], area_weights = cotangent_laplacian(vertices, faces)
     mesh_dictionary['area_weights'] = np.array(area_weights.todense()).T[0]
     mesh_dictionary['num_vertices'] = len(vertices)
+
+    # needed for (Solomon, 2015) method
+    # use cholesky factorization to efficiently solve systems of linear equations
+    if steps <= 0:
+        raise ValueError('steps must be greater than zero')
+    matrix_to_pre_factor = np.diag(mesh_dictionary['area_weights']) + time / steps * mesh_dictionary['cot_laplacian']
+    mesh_dictionary['steps'] = steps
+    mesh_dictionary['sparse'] = sparse
+    if sparse:
+        sparse_m_to_factor = sps.csr_matrix(matrix_to_pre_factor)
+        mesh_dictionary['factor'] = cholesky(sparse_m_to_factor)
+    else:
+        mesh_dictionary['L'] = np.linalg.cholesky(matrix_to_pre_factor)
     
     return mesh_dictionary
     

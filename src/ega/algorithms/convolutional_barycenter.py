@@ -3,12 +3,12 @@ from scipy.optimize import root_scalar
 from typing import Callable
 
 class ConvolutionalBarycenter():
-    def __init__(self, niter=1500, tol=1e-7, verb=1, unit_area_projection=0):
+    def __init__(self, niter=1500, tol=1e-5, verb=True, normalization=False):
         super(ConvolutionalBarycenter, self).__init__()
         self.niter = niter
         self.tol = tol
         self.verb = verb
-        self.unit_area_projection = unit_area_projection
+        self.normalization = normalization
     
     def get_convolutional_barycenter(
         self, 
@@ -16,7 +16,6 @@ class ConvolutionalBarycenter():
         alpha: float,
         graph_field_integrator: Callable,
         area_weights: float=None,
-        entropyLimit: float=None,
         initial_v: float=None,
         initial_barycenter: float=None
     ):
@@ -52,14 +51,17 @@ class ConvolutionalBarycenter():
             vectors v, w, and d: instead of computing a transportation plan matrix, we can alternatively compute vectors v, w, and d
                 reducing the number of unknowns
             """
-            w = np.divide(distributions_arr, graph_field_integrator(np.multiply(v.T, area_weights).T))
-            
-            if self.unit_area_projection == 1:
-                matrix_vector_product = graph_field_integrator(np.multiply(w.T, area_weights).T)
-                integrals = np.sum(np.multiply(area_weights, np.multiply(v, matrix_vector_product), 1))
-                w = w / integrals
-            
-            d = np.multiply(v, graph_field_integrator(np.multiply(w.T, area_weights).T))
+            integrator_input = np.multiply(v.T, area_weights).T
+            integrator_output = graph_field_integrator(integrator_input)
+            if self.normalization:
+                 integrator_output = integrator_output / graph_field_integrator(np.ones(integrator_input.shape))
+            w = np.divide(distributions_arr, integrator_output)
+
+            integrator_input = np.multiply(w.T, area_weights).T
+            integrator_output = graph_field_integrator(integrator_input)
+            if self.normalization:
+                 integrator_output = integrator_output / graph_field_integrator(np.ones(integrator_input.shape))
+            d = np.multiply(v, integrator_output)
 
             d[d < 1e-300] = 1e-300
 
@@ -67,32 +69,12 @@ class ConvolutionalBarycenter():
 
             entropy = -np.sum(np.multiply(area_weights, np.multiply(barycenter, np.log(barycenter))))
 
-            if j > 1 and (entropyLimit is not None) and (entropy > entropyLimit):
-                # Entropic-Sharpening algorithm. Refer to Algorithm 3 in (Solomon et al, 2015)
-                fn = lambda x: -np.sum(x * np.multiply(area_weights,
-                               np.multiply(np.power(barycenter, x), np.log(barycenter)))) - entropyLimit
-                try:
-                    sol = root_scalar(fn, args=(), method='toms748', bracket=[0.5, 3])
-                    beta = sol.root 
-                    if self.verb == 1:
-                        print('\ta = %g\n', beta)
-                except:
-                    beta = 1
-                    print('\tProjection failed.\n')
-                
-                barycenter = np.power(barycenter, beta)
-
             v = np.multiply(v.T, barycenter).T / d
-            
-            if self.unit_area_projection == 1:
-                matrix_vector_product = graph_field_integrator(np.multiply(w, area_weights))
-                integrals = np.sum(np.multiply(area_weights, np.multiply(v, matrix_vector_product), 1))
-                v = np.divide(v, integrals)
 
             change = np.sum(np.multiply(np.absolute(old_barycenter - barycenter), area_weights))
             area = np.sum(np.multiply(barycenter, area_weights))
             
-            if self.verb == 1:
+            if self.verb:
                 print('Iteration {0}:  change = {1}, area = {2}\n'.format(j, change, area))
             if j > 1 and change < self.tol:
                 return barycenter

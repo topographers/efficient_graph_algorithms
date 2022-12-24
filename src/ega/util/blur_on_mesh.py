@@ -1,7 +1,8 @@
 import numpy as np
 import scipy
+from sksparse.cholmod import cholesky
 
-def blur_on_mesh(signal: float, mesh_dictionary: dict, time: float, steps: int):
+def blur_on_mesh(signal: float, mesh_dictionary: dict):
     '''
     efficient matrix vector multiplication using cotangent Laplacian and Cholesky factorization.
     the procedure is described in (Solomon et al, 2015) section 5.
@@ -14,15 +15,18 @@ def blur_on_mesh(signal: float, mesh_dictionary: dict, time: float, steps: int):
     output:
         a 1d vector, the result of the matrix vector multplication  
     '''
-    area_weights = mesh_dictionary['area_weights']
-    if steps <= 0:
-        raise ValueError('steps must be greater than zero')
-    matrix_to_pre_factor = np.diag(area_weights) + time / steps * mesh_dictionary['cot_laplacian']
-    # use cholesky factorization to efficiently solve systems of linear equations
-    L = np.linalg.cholesky(matrix_to_pre_factor)
     result = signal
-    for _ in range(steps):
-        result = scipy.linalg.cho_solve((L, True), np.multiply(result.T, area_weights).T)
+    area_weights = mesh_dictionary['area_weights']
+    if mesh_dictionary['sparse']:
+        factor = mesh_dictionary['factor']
+        for _ in range(mesh_dictionary['steps']):
+            b = np.multiply(result.T, area_weights).T
+            result = factor(b)
+    else:
+        L = mesh_dictionary['L']
+        for _ in range(mesh_dictionary['steps']):
+            b = np.multiply(result.T, area_weights).T
+            result = scipy.linalg.cho_solve((L, True), b)
     return result
 
 
