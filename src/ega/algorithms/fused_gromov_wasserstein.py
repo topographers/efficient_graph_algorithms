@@ -1090,6 +1090,7 @@ def gw_barycenters(
     bary_epsilon=None,
     bary_lambda_par=None,
     bary_rand_feats=None,
+    stopThr=1e-9,
 ):
     if Cs is not None:
         S = len(Cs)
@@ -1142,6 +1143,7 @@ def gw_barycenters(
                     q,
                     loss_fun,
                     max_iter=max_iter,
+                    stopThr=stopThr,
                     log=False,
                     armijo=armijo,
                     alpha=alpha,
@@ -1163,6 +1165,7 @@ def gw_barycenters(
                     log=False,
                     method_type=method_type,
                     max_iter=max_iter,
+                    stopThr=stopThr,
                     source_integrator=integrators[s],
                     target_integrator=xalea_integrator,
                 )
@@ -1234,6 +1237,7 @@ def fgw_barycenters(
     metric="dirac",
     p_norm=None,
     w=None,
+    stopThr=1e-9,
 ):
     """
     Compute the fgw barycenter as presented eq (5) in [3].
@@ -1398,6 +1402,7 @@ def fgw_barycenters(
                     loss_fun,
                     alpha,
                     max_iter=max_iter,
+                    stopThr=stopThr,
                     verbose=verbose,
                     armijo=armijo,
                     log=False,
@@ -1427,6 +1432,8 @@ def fgw_barycenters(
                     dim=None,
                     source_integrator=xalea_integrator,
                     target_integrator=integrators[s],
+                    max_iter=max_iter,
+                    stopThr=stopThr,
                 )
                 for s in range(S)
             ]
