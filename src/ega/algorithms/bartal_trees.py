@@ -97,7 +97,7 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
         
         return tree 
 
-    
+        
     def _low_diameter_decomposition(self, cluster, diam):
         """
         Decompose current cluster into lower diameter clusters
@@ -115,30 +115,3 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
             clusters += [new_cluster]
             unsampled_nodes = unsampled_nodes.difference(new_cluster)
         return clusters
-
-
-    def _shortest_path_ball(self, center, R, unsampled_nodes):
-        """
-        Return a cluster (connected component) from unsampled_nodes 
-        centered at node center with radius < R.
-        Specifically, grow a shortest path ball from center node over the 
-        unsampled nodes with radius < R.
-        """
-        cluster = [center]
-        visited = np.zeros(self.n)
-        candidates = [center] # candidates to be added to a cluster
-        while len(candidates) >= 1:
-            next_candidates = []
-            for ni in candidates:
-                if visited[ni] == 1: continue
-                visited[ni] = 1
-                for nj in self._adjacency_lists[ni]:
-                    # check if nj is inside the ball(center, R)
-                    if (nj not in unsampled_nodes) or (self._dist_G[center, nj] >= R) or \
-                                                    (visited[nj] == 1): 
-                        visited[nj] = 1
-                        continue
-                    cluster += [nj]
-                    next_candidates += [nj]
-            candidates = next_candidates
-        return list(set(cluster))

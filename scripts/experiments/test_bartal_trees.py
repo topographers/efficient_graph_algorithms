@@ -4,42 +4,8 @@ import networkx as nx
 
 from ega.algorithms.brute_force import BFGFIntegrator
 from ega.algorithms.bartal_trees import BartalTreeGFIntegrator
+from graphs_networkx_utils import *
 
-
-def get_adjacency_lists_from_A(A):
-    n = A.shape[0]
-    adjacency_lists = [[] for _ in range(n)]
-    weights_lists = [[] for _ in range(n)]
-    for i in range(n):
-        for j in range(i+1, n):
-            if A[i,j] != 0:
-                adjacency_lists[i] += [j]
-                adjacency_lists[j] += [i]
-                weights_lists[i] += [A[i,j]]
-                weights_lists[j] += [A[i,j]]
-    return adjacency_lists, weights_lists
-
-def get_adjacency_nx(G):
-    A_srs = nx.to_scipy_sparse_array(G)
-    A = np.array(A_srs.todense())
-    print(f"{A[A > 0].min() = }, {A[A > 0].max() = }")
-    return A
-
-def get_rel_diff(a, b=None):
-    if not type(a).__module__ == np.__name__:
-        a = np.array([a])
-        b = np.array([b])  
-    if a.ndim==0 or a.shape[0] == a.size or a.ndim>1 and a.shape[1] == a.size: ord = None
-    else: ord = 'fro'
-    return np.linalg.norm(a-b, ord=ord) / min(np.linalg.norm(a, ord=ord), np.linalg.norm(b, ord=ord))
-
-def print_subopt_ratios(dist_T, dist_G):
-    n = dist_T.shape[0]
-    ratios =  np.divide(dist_T, dist_G + np.eye(n))
-    ratios = ratios[np.ones(dist_T.shape) - np.eye(n) == 1]
-    prob, vals = np.histogram(ratios, 5, density=True)
-    print(f"{prob = }")
-    print(f"{vals = }, {ratios.min() = }, {ratios.max() = }")
 
 def main():
     # GENERAL PARAMETERS
@@ -47,7 +13,7 @@ def main():
     k = 10
     f_fun = lambda x: np.exp(-x)
     vertices = np.arange(n)
-    num_samples = 1  
+    num_samples = 10  
 
     ## CREATE GRAPHS
     graphs = {}
@@ -141,8 +107,12 @@ def main():
                     assert node in tree['adj'][ni], print("adjacency lists does not is not complete")
                     node_idx = (tree['adj'][ni]).index(node)
                     assert tree['w'][node][ni_idx] == tree['w'][ni][node_idx]
+
+            # each node appears once in the levels
+            nodes_levels = [node for lev in tree['levels'] for node in lev]
+            assert len(nodes_levels) == bartal_trees.n and set(nodes_levels) == set(range(bartal_trees.n))
             
-    print("PASSED adjacency and weights lists are consistent")
+    print("PASSED adjacency and weights lists are consistent; levels are correct")
 
     # --------------- Bartal trees distortion: averaging vs minimum ---------------
 

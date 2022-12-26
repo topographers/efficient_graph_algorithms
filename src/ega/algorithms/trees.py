@@ -117,3 +117,34 @@ class TreeGFIntegrator(GFIntegrator):
                     sums[child_node] = self._f_fun(w) * sums[node] + \
                                             (1 - self._f_fun(2*w)) * partial_sums[child_node]
         return sums
+
+
+    def _shortest_path_ball(self, center, R, unsampled_nodes=None, list_type=True):
+        """
+        Return a cluster (connected component) from unsampled_nodes 
+        centered at node center with radius < R.
+        Specifically, grow a shortest path ball from center node over the 
+        unsampled nodes with radius < R.
+        """
+        cluster = [center]
+        visited = np.zeros(self.n)
+        candidates = [center] # candidates to be added to a cluster
+        if unsampled_nodes == None: 
+            func_nj_sampled = lambda nj: False
+        else:
+            func_nj_sampled = lambda nj: nj not in unsampled_nodes
+        while len(candidates) >= 1:
+            next_candidates = []
+            for ni in candidates:
+                if visited[ni] == 1: continue
+                visited[ni] = 1
+                for nj in self._adjacency_lists[ni]:
+                    # check if nj is inside the ball(center, R) & unsampled
+                    if func_nj_sampled(nj) or (self._dist_G[center, nj] >= R) or \
+                                                    (visited[nj] == 1): 
+                        visited[nj] = 1
+                        continue
+                    cluster += [nj]
+                    next_candidates += [nj]
+            candidates = next_candidates
+        return list(set(cluster)) if list_type else set(cluster)

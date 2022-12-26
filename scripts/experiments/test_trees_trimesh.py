@@ -4,23 +4,15 @@ import time
 import numpy as np
 import trimesh
 
+from graphs_networkx_utils import *
+
 from ega import default_trimesh_dataset_path
 from ega.algorithms.brute_force import BFGFIntegrator
+from ega.algorithms.frt_trees import FRTTreeGFIntegrator
 from ega.algorithms.separation_gf_integrator import SeparationGFIntegrator
 from ega.algorithms.bartal_trees import BartalTreeGFIntegrator
 from ega.algorithms.spanning_trees import SpanningTreeGFIntegrator
 from ega.util.mesh_utils import trimesh_to_adjacency_matrices
-
-def get_rel_diff(a, b=None, den=None):
-    if not type(a).__module__ == np.__name__:
-        a = np.array([a])
-        b = np.array([b])  
-    if a.ndim==0 or a.shape[0] == a.size or a.ndim>1 and a.shape[1] == a.size: ord = None
-    else: ord = 'fro'
-    if den is None:
-        return np.linalg.norm(a-b, ord=ord) / min(np.linalg.norm(a, ord=ord), np.linalg.norm(b, ord=ord))
-    else:
-        return np.linalg.norm(a-den, ord=ord) / np.linalg.norm(den, ord=ord)
 
 
 def main():
@@ -65,13 +57,19 @@ def main():
     bartal_trees = BartalTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
                                                     f_fun, num_trees)
     end = time.time()
-    print("Constructor for Bartal trees (BT) takes time: ", end - start)
+    print("Constructor for %d Bartal trees (BT) takes time: "%num_trees, end - start)
+    start = time.time()
+    num_trees = 1
+    spanning_trees = SpanningTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
+                                                    f_fun, num_trees)
+    end = time.time()
+    print("Constructor for %d Spanning trees (ST) takes time: "%num_trees, end - start)
     start = time.time()
     num_trees = 30
-    spanning_trees = SpanningTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
-                                                    f_fun, num_trees=1)
+    frt_trees = FRTTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
+                                                    f_fun, num_trees)
     end = time.time()
-    print("Constructor for Spanning trees (ST) takes time: ", end - start)
+    print("Constructor for %d FRT trees (FRT) takes time: "%num_trees, end - start)
     start = time.time()
     sgf_integrator = SeparationGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun,
                                             unit_size=unit_size, threshold_nb_vertices=threshold_nb_vertices)
@@ -100,6 +98,13 @@ def main():
     result = spanning_trees.integrate_graph_field(field)
     end = time.time()
     print("Graph field integration for Spanning trees (ST) takes time: ", end - start)
+    print(f"{get_rel_diff(result, den=result_bf)  = }")
+
+    # FRT trees GFI 
+    start = time.time()
+    result = frt_trees.integrate_graph_field(field)
+    end = time.time()
+    print("Graph field integration for FRT trees (FRT) takes time: ", end - start)
     print(f"{get_rel_diff(result, den=result_bf)  = }")
 
     # Seperator GFI
