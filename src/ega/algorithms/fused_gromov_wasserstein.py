@@ -2,6 +2,9 @@
 # https://github.com/tvayer/FGW
 
 import numpy as np
+import scipy as sp
+from scipy.spatial.distance import cdist
+import ot
 import ega.algorithms.optimization
 from ega.algorithms.graph_diffusion_gf_integrator import DFGFIntegrator
 from ega.algorithms.separation_gf_integrator import SeparationGFIntegrator
@@ -495,9 +498,9 @@ def gw_lp(
     elif method_type == "separator":
         if loss_fun == "square_loss":
             f_fun_s = lambda x: np.exp(-source_lambda_par * x)
-            f_fun_t = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_t = lambda x: np.exp(-target_lambda_par * x)
             f_fun_s_sq = lambda x: np.exp(-2 * source_lambda_par * x)
-            f_fun_t_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            f_fun_t_sq = lambda x: np.exp(-2 * target_lambda_par * x)
             dfgf_s_sq_integrator = SeparationGFIntegrator(
                 adjacency_lists=source_adjacency_lists,
                 weights_lists=source_weights_lists,
@@ -806,9 +809,9 @@ def fgw_lp(
     elif method_type == "separator":
         if loss_fun == "square_loss":
             f_fun_s = lambda x: np.exp(-source_lambda_par * x)
-            f_fun_t = lambda x: np.exp(-source_lambda_par * x)
+            f_fun_t = lambda x: np.exp(-target_lambda_par * x)
             f_fun_s_sq = lambda x: np.exp(-2 * source_lambda_par * x)
-            f_fun_t_sq = lambda x: np.exp(-2 * source_lambda_par * x)
+            f_fun_t_sq = lambda x: np.exp(-2 * target_lambda_par * x)
             dfgf_s_sq_integrator = SeparationGFIntegrator(
                 adjacency_lists=source_adjacency_lists,
                 weights_lists=source_weights_lists,
@@ -936,6 +939,15 @@ def fgw_lp(
             stopThr=stopThr,
         )
         return res
+
+
+def reshaper(x):
+    x = np.array(x)
+    try:
+        a = x.shape[1]
+        return x
+    except IndexError:
+        return x.reshape(-1, 1)
 
 
 def update_square_loss(p, lambdas, T, Cs, method_type):
