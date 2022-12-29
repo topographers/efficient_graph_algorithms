@@ -211,12 +211,19 @@ def node_cost_st(
         n_s = p_s.shape[0]
         n_t = p_t.shape[0]
         if loss_type == "L2":
-            f1_st = np.repeat(
-                fast_multiply_matrix_square(source_integrator, p_s), n_t, axis=1
-            )
-            f2_st = np.repeat(
-                fast_multiply_matrix_square(target_integrator, p_t).T, n_s, axis=0
-            )
+            if target_integrator is not None :
+                f1_st = np.repeat(
+                    fast_multiply_matrix_square(source_integrator, p_s), n_t, axis=1
+                )
+                f2_st = np.repeat(
+                    fast_multiply_matrix_square(target_integrator, p_t).T, n_s, axis=0
+                )
+            else :
+                f1_st = np.repeat(
+                    fast_multiply_matrix_square(source_integrator, p_s), n_t, axis=1
+                )
+                f2_st = np.repeat(((cost_t**2) @ p_t).T, n_s, axis=0)
+
         else:
             f1_st = np.repeat(
                 np.matmul(cost_s * np.log(cost_s + 1e-15) - cost_s, p_s), n_t, axis=1
@@ -283,12 +290,17 @@ def node_cost(
 
     elif method_type == "diffusion":
         if loss_type == "L2":
-            cost_partial = source_integrator.integrate_graph_field(trans)
-            cost = (
-                cost_st
-                - 2 * (target_integrator.integrate_graph_field(cost_partial.T)).T
-            )
-            del cost_partial
+            if target_integrator is not None :
+                cost_partial = source_integrator.integrate_graph_field(trans)
+                cost = (
+                    cost_st
+                    - 2 * (target_integrator.integrate_graph_field(cost_partial.T)).T
+                )
+                del cost_partial
+            else :
+                cost_partial = source_integrator.integrate_graph_field(trans)
+                cost = cost_st - 2 * (cost_partial @ cost_t.T)
+                del cost_partial
 
         else:
             cost_partial = source_integrator.integrate_graph_field(trans)
@@ -410,7 +422,8 @@ def gromov_wasserstein_discrepancy(
                     fourier_transform,
                 )
             else :
-               dfgf_s_integrator 
+               dfgf_s_integrator = source_integrator
+               dfgf_t_integrator = target_integrator
         else:
             dfgf_s_integrator = DFGFIntegrator(
                 source_positions,
@@ -508,8 +521,8 @@ def gromov_wasserstein_discrepancy(
             )
         else:
             cost = node_cost(
-                cost_s=None,
-                cost_t=None,
+                cost_s,
+                cost_t,
                 trans=trans0,
                 cost_st=cost_st,
                 loss_type=ot_hyperpara["loss_type"],
@@ -566,8 +579,8 @@ def gromov_wasserstein_discrepancy(
         )
     else:
         cost = node_cost(
-            cost_s=None,
-            cost_t=None,
+            cost_s,
+            cost_t,
             trans=trans0,
             cost_st=cost_st,
             loss_type=ot_hyperpara["loss_type"],
@@ -579,15 +592,14 @@ def gromov_wasserstein_discrepancy(
     return trans0, d_gw, p_s
 
 
-## TODO: inject the fast variants
 def gromov_wasserstein_average(
-    transports: Dict, costs: Dict, p_center: np.ndarray, weights: Dict, loss_type: str
+    transports: Dict, costs: Dict, p_center: np.ndarray, weights: Dict, loss_type: str, method_type: str,
 ) -> np.ndarray:
     """
     Averaging of cost matrix
     Args:
         transports: a dictionary, whose keys are graph ids and values are (n_s, n_c) np.ndarray of optimal transports
-        costs: a dictionary, whose keys are graph ids and values are (n_s, n_s) np.ndarray of cost matrices
+        costs: a dictionary, whose keys are graph ids and values are (n_s, n_s) np.ndarray of cost matrices or graph-field integrators
         p_center: (n_c, 1) np.ndarray of barycenter's distribution
         weights: a dictionary, whose keys are graph ids and values are float number of weight
         loss_type: 'L2' the Euclidean loss type for Gromov-Wasserstein discrepancy
@@ -600,10 +612,15 @@ def gromov_wasserstein_average(
         for n in costs.keys():
             cost = costs[n]
             trans = transports[n]
-            # barycenter += weights[n] * np.matmul(np.matmul(trans.T, cost), trans)
-            barycenter += weights[n] * (trans.T @ (cost @ trans))
+            if method_type is None:
+                barycenter += weights[n] * (trans.T @ (cost @ trans))
+            else :
+                barycenter += weights[n] * (trans.T @ (cost.integrate_graph_field(trans)))
         barycenter /= np.matmul(p_center, p_center.T)
     else:
+        if method_type is not None: 
+            raise NotImplementedError("Other methods are not compatible with KL loss")
+
         for n in costs.keys():
             cost = costs[n]
             trans = transports[n]
@@ -618,15 +635,21 @@ def gromov_wasserstein_average(
 def gromov_wasserstein_barycenter(
     costs: Dict,
     p_s: Dict,
-    p_center: np.ndarray,
     ot_hyperpara: Dict,
+    p_center: np.ndarray = None,
     weights: Dict = None,
+    method_type: str = None,
+    N: int = None,
+    bary_epsilon: float = None ,
+    bary_lambda_par: float = None,
+    bary_rand_feats: int = None,
+
 ) -> Tuple[np.ndarray, Dict, List]:
     """
     Multi-graph matching based on one-step Gromov-Wasserstein barycenter learning.
 
     Args:
-        costs: a dictionary, whose keys are graph ids and values are (n_s, n_s) cost matrices of different graphs
+        costs: a dictionary, whose keys are graph ids and values are (n_s, n_s) cost matrices of different graphs or graph-field integrators
         p_s: a dictionary, whose keys are graph ids and values ara (n_s, 1) distributions of nodes of different graphs
         p_center: (n_c, 1) array, the distribution of barycenter's nodes
         ot_hyperpara: the dictionary of hyperparameters to train the Gromov-Wasserstein barycenter.
@@ -648,7 +671,14 @@ def gromov_wasserstein_barycenter(
         for n in costs.keys():
             weights[n] = 1 / num
 
+    if p_center is None and N is None : 
+        raise ValueError("Specify either the probability distribution on the target nodes or specify the number of desired nodes")
+
+    if p_center is None and N is not None :
+        p_center = (np.ones(N) / N).reshape(-1,1)
+
     barycenter0 = csr_matrix(np.diag(p_center[:, 0]))
+
 
     d_gw_sum = []
     i = 0
@@ -657,12 +687,17 @@ def gromov_wasserstein_barycenter(
         # update optimal transport
         d_gw = {}
         for n in costs.keys():
-            transports[n], d_gw[n], p_s[n] = gromov_wasserstein_discrepancy(
-                costs[n], barycenter0, p_s[n], p_center, ot_hyperpara, transports[n]
-            )
+            if method_type is None :
+                transports[n], d_gw[n], p_s[n] = gromov_wasserstein_discrepancy(
+                    cost_s=costs[n], cost_t=barycenter0, p_s=p_s[n], p_t=p_center, ot_hyperpara=ot_hyperpara, trans0=transports[n], method_type=method_type
+                )
+            else :
+                transports[n], d_gw[n], p_s[n] = gromov_wasserstein_discrepancy(cost_s=None, cost_t=barycenter0, p_s=p_s[n], p_t=p_center, ot_hyperpara=ot_hyperpara, 
+                                        trans0=transports[n], method_type = method_type, source_integrator=costs[n], target_integrator=None
+                                )
         # averaging cost matrix
         barycenter = gromov_wasserstein_average(
-            transports, costs, p_center, weights, ot_hyperpara["loss_type"]
+            transports, costs, p_center, weights, ot_hyperpara["loss_type"], method_type,
         )
         relative_error = np.sum(np.abs(barycenter - barycenter0)) / np.sum(
             np.abs(barycenter0)
