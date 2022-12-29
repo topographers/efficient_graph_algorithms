@@ -334,6 +334,8 @@ def gromov_wasserstein_discrepancy(
     target_weights_lists=None,
     target_vertices=None,
     target_unit_size=None,
+    source_integrator=None, 
+    target_integrator=None, 
 ) -> Tuple[np.ndarray, float, np.ndarray]:
     """
     Calculate Gromov-Wasserstein discrepancy with optionally-updated source probability
@@ -386,26 +388,29 @@ def gromov_wasserstein_discrepancy(
     relative_error = np.inf
     if method_type == "diffusion":
         if ot_hyperpara["loss_type"] == "L2":
-            dfgf_s_integrator = DFGFIntegrator(
-                source_positions,
-                source_epsilon,
-                source_lambda_par,
-                num_rand_features,
-                dim,
-                random_projection_creator,
-                density_function,
-                fourier_transform,
-            )
-            dfgf_t_integrator = DFGFIntegrator(
-                target_positions,
-                target_epsilon,
-                target_lambda_par,
-                num_rand_features,
-                dim,
-                random_projection_creator,
-                density_function,
-                fourier_transform,
-            )
+            if source_integrator is None and target_integrator is None:
+                dfgf_s_integrator = DFGFIntegrator(
+                    source_positions,
+                    source_epsilon,
+                    source_lambda_par,
+                    num_rand_features,
+                    dim,
+                    random_projection_creator,
+                    density_function,
+                    fourier_transform,
+                )
+                dfgf_t_integrator = DFGFIntegrator(
+                    target_positions,
+                    target_epsilon,
+                    target_lambda_par,
+                    num_rand_features,
+                    dim,
+                    random_projection_creator,
+                    density_function,
+                    fourier_transform,
+                )
+            else :
+               dfgf_s_integrator 
         else:
             dfgf_s_integrator = DFGFIntegrator(
                 source_positions,
