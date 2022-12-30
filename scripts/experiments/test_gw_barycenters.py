@@ -126,9 +126,6 @@ def main():
         armijo=args.use_armijo,
         method_type=None,
         integrators=None,
-        bary_epsilon=None,
-        bary_lambda_par=None,
-        bary_rand_feats=None,
     )
     elapsed_time = time.time() - time_s
     del C0, C1, C2, D0, D1, D2, Cs
@@ -185,9 +182,6 @@ def main():
         armijo=args.use_armijo,
         method_type="diffusion",
         integrators=Cs1,
-        bary_epsilon=args.epsilon,
-        bary_lambda_par=args.lambda_par,
-        bary_rand_feats=16,
     )
     elapsed_time1 = time.time() - time_s1
 
