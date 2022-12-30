@@ -118,14 +118,31 @@ def init_matrix(
 
     elif method_type == "diffusion":
         if loss_fun == "square_loss":
-            constC1 = np.dot(
-                fast_multiply_matrix_square(source_integrator, p.reshape(-1, 1)),
-                np.ones(len(q)).reshape(1, -1),
+            if source_integrator is not None and target_integrator is not None:
+                constC1 = np.dot(
+                    fast_multiply_matrix_square(source_integrator, p.reshape(-1, 1)),
+                    np.ones(len(q)).reshape(1, -1),
+                )
+                constC2 = np.dot(
+                    np.ones(len(p)).reshape(-1, 1),
+                    fast_multiply_matrix_square(target_integrator, q.reshape(-1, 1)).T,
+                )
+            elif target_integrator is None and source_integrator is not None:
+                constC1 = np.dot(
+                    fast_multiply_matrix_square(source_integrator, p.reshape(-1, 1)),
+                    np.ones(len(q)).reshape(1, -1),
+                )
+                constC2 = np.dot(
+                np.ones(len(p)).reshape(-1, 1), np.dot(q.reshape(1, -1), f2(C2).T)
             )
-            constC2 = np.dot(
-                np.ones(len(p)).reshape(-1, 1),
-                fast_multiply_matrix_square(target_integrator, q.reshape(-1, 1)).T,
+            elif source_integrator is None and target_integrator is not None:
+                constC1 = np.dot(
+                np.dot(f1(C1), p.reshape(-1, 1)), np.ones(len(q)).reshape(1, -1)
             )
+                constC2 = np.dot(
+                    np.ones(len(p)).reshape(-1, 1),
+                    fast_multiply_matrix_square(target_integrator, q.reshape(-1, 1)).T,
+                )
 
         elif loss_fun == "kl_loss":
             constC1 = np.dot(
@@ -163,7 +180,12 @@ def init_matrix(
         hC2 = h2(C2)
     else:
         if loss_fun == "square_loss":
-            hC1, hC2 = None, None
+            if C1 is None and C2 is None :
+                hC1, hC2 = None, None
+            elif C1 is None and C2 is not None :
+                hC1, hC2 = None, h2(C2)
+            elif C2 is None and C1 is not None :
+                hC1, hC2 = h1(C1), None
         else:
             hC1, hC2 = None, h2(C2)
 
@@ -211,9 +233,18 @@ def tensor_product(
         A = -np.dot(np.dot(hC1, T), hC2.T)
     else:
         if loss_fun == "square_loss":
-            partial_prod = source_integrator.integrate_graph_field(T)
-            A = -2 * (target_integrator.integrate_graph_field(partial_prod.T)).T
-            del partial_prod
+            if source_integrator is not None and target_integrator is not None:
+                partial_prod = source_integrator.integrate_graph_field(T)
+                A = -2 * (target_integrator.integrate_graph_field(partial_prod.T)).T
+                del partial_prod
+            elif source_integrator is not None and target_integrator is None:
+                partial_prod = source_integrator.integrate_graph_field(T)
+                A = -np.dot(partial_prod, hC2.T)
+                del partial_prod
+            elif target_integrator is not None and source_integrator is None :
+                partial_prod = np.dot(hC1, T)
+                A = -2 * (target_integrator.integrate_graph_field(partial_prod.T)).T
+                del partial_prod
         elif loss_fun == "kl_loss":
             partial_prod = source_integrator.integrate_graph_field(T)
             A = -np.dot(partial_prod, hC2.T)
@@ -1099,9 +1130,6 @@ def gw_barycenters(
     armijo=True,
     method_type="diffusion",
     integrators=None,
-    bary_epsilon=None,
-    bary_lambda_par=None,
-    bary_rand_feats=None,
     stopThr=1e-9,
 ):
     if Cs is not None:
@@ -1110,29 +1138,13 @@ def gw_barycenters(
         S = len(integrators)
 
     # Initialization of C : random SPD matrix (if not provided by user)
-    if method_type is None:
-        if init_C is None:
-            np.random.seed(random_state)
-            xalea = np.random.rand(N, 2)
-            C = sp.spatial.distance.cdist(xalea, xalea, "minkowski", p=1)
-            C /= C.max()
-        else:
-            C = init_C
-    elif method_type == "diffusion":
+    if init_C is None:
         np.random.seed(random_state)
         xalea = np.random.rand(N, 2)
-        xalea_integrator = DFGFIntegrator(
-            positions=xalea,
-            epsilon=bary_epsilon,
-            lambda_par=bary_lambda_par,
-            num_rand_features=bary_rand_feats,
-            dim=2,
-            random_projection_creator=random_projection_creator,
-            density_function=density_function,
-            fourier_transform=fourier_transform,
-        )
+        C = sp.spatial.distance.cdist(xalea,xalea, 'minkowski', p=1)
+        C /= C.max()
     else:
-        raise NotImplementedError("KL div and other losses are not implemented")
+        C = init_C #choosing proper init_C can lead to better results
 
     cpt = 0
     err = 1
@@ -1140,11 +1152,7 @@ def gw_barycenters(
     error = []
 
     while err > tol and cpt < max_iter:
-        if method_type is None:
-            Cprev = C
-        else:
-            C = np.identity(N, dtype=float)
-            Cprev = C
+        Cprev = C
 
         if method_type is None:
             T = [
@@ -1167,7 +1175,7 @@ def gw_barycenters(
             T = [
                 gw_lp(
                     C1=None,
-                    C2=None,
+                    C2=C,
                     p=ps[s],
                     q=q,
                     loss_fun=loss_fun,
@@ -1179,7 +1187,7 @@ def gw_barycenters(
                     max_iter=max_iter,
                     stopThr=stopThr,
                     source_integrator=integrators[s],
-                    target_integrator=xalea_integrator,
+                    target_integrator=None,
                 )
                 for s in range(S)
             ]
@@ -1243,9 +1251,6 @@ def fgw_barycenters(
     armijo=True,
     integrators=None,
     method_type=None,
-    bary_epsilon=None,
-    bary_lambda_par=None,
-    bary_rand_feats=None,
     metric="dirac",
     p_norm=None,
     w=None,
@@ -1308,33 +1313,18 @@ def fgw_barycenters(
     if p is None:
         p = np.ones(N) / N
 
-    if fixed_structure:
+    if fixed_structure: 
         if init_C is None:
-            raise ValueError("If C is fixed it must be initialized")
+            raise ValueError('If C is fixed it must be initialized')
         else:
             C = init_C
     else:
-        if init_C is None and method_type is None:
+        if init_C is None:
             xalea = np.random.randn(N, 2)
-            C = ot.dist(xalea, xalea)
+            C = sp.spatial.distance.cdist(xalea,xalea, 'minkowski', p=1)
             C /= C.max()
-        elif method_type == "diffusion" and init_C is None:
-            np.random.seed(random_seed)
-            xalea = np.random.rand(N, 2)
-            xalea_integrator = DFGFIntegrator(
-                positions=xalea,
-                epsilon=bary_epsilon,
-                lambda_par=bary_lambda_par,
-                num_rand_features=bary_rand_feats,
-                dim=2,
-                random_projection_creator=random_projection_creator,
-                density_function=density_function,
-                fourier_transform=fourier_transform,
-            )
-        elif method_type == "separator" and init_C is None:
-            raise NotImplementedError("Separator is not implemented yet")
-        else:
-            C = init_C
+        else :
+            C = init_C # Note that choosing a proper init_C can lead to improved performance
 
     if fixed_features:
         if init_X is None:
@@ -1366,12 +1356,7 @@ def fgw_barycenters(
         log_["Ts_iter"] = []
 
     while (err_feature > tol or err_structure > tol) and cpt < max_iter:
-        if method_type is None:
-            Cprev = C
-        else:
-            C = np.identity(N, dtype=float)
-            Cprev = C
-
+        Cprev = C
         Xprev = X
 
         if not fixed_features:
@@ -1425,7 +1410,7 @@ def fgw_barycenters(
             T = [
                 fgw_lp(
                     Ms[s],
-                    C1=None,
+                    C1=C,
                     C2=None,
                     p=p,
                     q=ps[s],
@@ -1442,7 +1427,7 @@ def fgw_barycenters(
                     target_lambda_par=None,
                     num_rand_features=None,
                     dim=None,
-                    source_integrator=xalea_integrator,
+                    source_integrator=None,
                     target_integrator=integrators[s],
                     max_iter=max_iter,
                     stopThr=stopThr,

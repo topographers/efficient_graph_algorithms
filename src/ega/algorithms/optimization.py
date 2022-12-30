@@ -183,22 +183,55 @@ def do_linesearch(
             c = cost(G)  # f(xt)
 
         else:
-            partial_dcost = source_integrator.integrate_graph_field(deltaG)
-            dot = (
-                target_integrator.integrate_graph_field(partial_dcost.T)
-            ).T  # use symmetry here
-            del partial_dcost
-            a = (
-                -2 * reg * np.sum(dot * deltaG)
-            )  # -2*alpha*<C1 dt C2,dt> si qqlun est pas bon c'est lui
-            partial_cost = source_integrator.integrate_graph_field(G)
-            b1 = (target_integrator.integrate_graph_field(partial_cost.T)).T
-            del partial_cost
-            b = np.sum((M + reg * constC) * deltaG) - 2 * reg * (
-                np.sum(dot * G) + np.sum(b1 * deltaG)
-            )
-            del b1
-            c = cost(G)
+            if source_integrator is not None and target_integrator is not None:
+                partial_dcost = source_integrator.integrate_graph_field(deltaG)
+                dot = (
+                    target_integrator.integrate_graph_field(partial_dcost.T)
+                ).T  # use symmetry here
+                del partial_dcost
+                a = (
+                    -2 * reg * np.sum(dot * deltaG)
+                )  # -2*alpha*<C1 dt C2,dt> si qqlun est pas bon c'est lui
+                partial_cost = source_integrator.integrate_graph_field(G)
+                b1 = (target_integrator.integrate_graph_field(partial_cost.T)).T
+                del partial_cost
+                b = np.sum((M + reg * constC) * deltaG) - 2 * reg * (
+                    np.sum(dot * G) + np.sum(b1 * deltaG)
+                )
+                del b1
+                c = cost(G)
+            elif target_integrator is None:
+                partial_dcost = source_integrator.integrate_graph_field(deltaG)
+                dot = np.dot(partial_dcost, C2)
+                del partial_dcost
+                a = (
+                    -2 * reg * np.sum(dot * deltaG)
+                )  # -2*alpha*<C1 dt C2,dt> si qqlun est pas bon c'est lui
+                partial_cost = source_integrator.integrate_graph_field(G)
+                b1 = np.dot(partial_cost, C2)
+                del partial_cost
+                b = np.sum((M + reg * constC) * deltaG) - 2 * reg * (
+                  np.sum(dot * G) + np.sum(b1 * deltaG)
+                )
+                del b1
+                c = cost(G)
+            elif source_integrator is None :
+                partial_dcost = np.dot(C1, deltaG)
+                dot = (
+                    target_integrator.integrate_graph_field(partial_dcost.T)
+                ).T  # use symmetry here
+                del partial_dcost
+                a = (
+                    -2 * reg * np.sum(dot * deltaG)
+                )
+                partial_cost = np.dot(C1,G)
+                b1 = (target_integrator.integrate_graph_field(partial_cost.T)).T
+                del partial_cost
+                b = np.sum((M + reg * constC) * deltaG) - 2 * reg * (
+                    np.sum(dot * G) + np.sum(b1 * deltaG)
+                )
+                del b1
+                c = cost(G)
 
         alpha = solve_1d_linesearch_quad_funct(a, b, c)
         if alpha_min is not None or alpha_max is not None:
