@@ -211,14 +211,14 @@ def node_cost_st(
         n_s = p_s.shape[0]
         n_t = p_t.shape[0]
         if loss_type == "L2":
-            if target_integrator is not None :
+            if target_integrator is not None and source_integrator is not None:
                 f1_st = np.repeat(
                     fast_multiply_matrix_square(source_integrator, p_s), n_t, axis=1
                 )
                 f2_st = np.repeat(
                     fast_multiply_matrix_square(target_integrator, p_t).T, n_s, axis=0
                 )
-            else :
+            elif target_integrator is None and source_integrator is not None :
                 f1_st = np.repeat(
                     fast_multiply_matrix_square(source_integrator, p_s), n_t, axis=1
                 )
@@ -290,14 +290,14 @@ def node_cost(
 
     elif method_type == "diffusion":
         if loss_type == "L2":
-            if target_integrator is not None :
+            if target_integrator is not None and source_integrator is not None :
                 cost_partial = source_integrator.integrate_graph_field(trans)
                 cost = (
                     cost_st
                     - 2 * (target_integrator.integrate_graph_field(cost_partial.T)).T
                 )
                 del cost_partial
-            else :
+            elif target_integrator is None and source_integrator is not None :
                 cost_partial = source_integrator.integrate_graph_field(trans)
                 cost = cost_st - 2 * (cost_partial @ cost_t.T)
                 del cost_partial
