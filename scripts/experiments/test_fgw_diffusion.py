@@ -42,6 +42,13 @@ parser.add_argument(
     help="Choose from dirac and hamming. Other methods are not yet implemented",
 )
 
+parser.add_argument(
+    "--different_random_features",
+    default=False,
+    type=bool,
+    help="Different random features",
+)
+
 def main():
     args = parser.parse_args()
     np.random.seed(args.seed)
@@ -56,7 +63,14 @@ def main():
     cov_s = np.matmul(r_s, r_s.T)
 
     mu_t = np.array([4, 4, 4])
-    r_t = np.random.rand(3,3)
+    if args.different_random_features:
+        r_t = np.array([
+            [random.random() * 1.0, random.random() * 2.0, random.random() * 3.0],
+            [random.random() * 4.0, random.random() * 5.0, random.random() * 6.0],
+            [random.random() * 7.0, random.random() * 8.0, random.random() * 9.0],
+        ])
+    else:
+        r_t = np.random.rand(3,3)
     cov_t = np.matmul(r_t, r_t.T)
 
     Q = sp.linalg.sqrtm(cov_s)
