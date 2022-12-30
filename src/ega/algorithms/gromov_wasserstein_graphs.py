@@ -379,7 +379,10 @@ def gromov_wasserstein_discrepancy(
     if method_type is None:
         n_s = cost_s.shape[0]
     elif method_type == "diffusion":
-        n_s = source_positions.shape[0]
+        if source_positions is not None :
+            n_s = source_positions.shape[0]
+        else :
+            n_s = source_integrator._positions.shape[0]
     elif method_type == "separator":
         n_s = source_vertices.shape[0]
     else:
