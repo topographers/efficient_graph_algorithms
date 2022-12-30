@@ -9,16 +9,18 @@ import argparse
 import os
 import pickle
 
-from ega.algorithms.fused_gromov_wasserstein import fgw_barycenters
+from ega.algorithms.gromov_wasserstein_graphs import ( 
+    gromov_wasserstein_barycenter, 
+    estimate_target_distribution 
+    )
 from ega.algorithms.graph_diffusion_gf_integrator import DFGFIntegrator
 from ega.util.mesh_utils import (
     random_projection_creator,
     density_function,
     fourier_transform,
 )
-
 parser = argparse.ArgumentParser(
-    description="Testing computations of Fused Gromov Wasserstein Barycenters"
+    description="Testing computations of Gromov Wasserstein Barycenters"
 )
 parser.add_argument("--seed", default=42, type=int)
 parser.add_argument(
@@ -40,30 +42,11 @@ parser.add_argument(
     help="Number of orthogonal random features, 16 and 32 works best for us. 64 produces bad results.",
 )
 parser.add_argument(
-    "--use_armijo",
-    default=True,
-    type=bool,
-    help="Whether to armijo line search algorithms. Turn it off if there are numerical instabilities",
-)
-parser.add_argument(
-    "--max_iter",
-    default=1000,
-    type=int,
-    help="Max number of iterations",
-)
-parser.add_argument(
-    "--tolerance",
-    default=1e-9,
-    type=float,
-    help="Error bound to stop iterations",
-)
-parser.add_argument(
     "--output_dir",
     default="/output/",
     type=str,
     help="Folder to save the output",
 )
-
 
 def main():
     args = parser.parse_args()
@@ -97,7 +80,21 @@ def main():
     C1[C1 > args.epsilon] = 0
     C2[C2 > args.epsilon] = 0
 
-    Ys = [(np.random.randint(2, size=args.n_samples)).reshape(-1, 1)] * 3
+
+    ot_dict = {'loss_type': 'L2',  # the key hyperparameters of GW distance
+                           'ot_method': 'proximal',
+                           'beta': 0.2,
+                           'outer_iteration': 1000,  # outer, inner iteration, error bound of optimal transport
+                           'iter_bound': 1e-10,
+                           'inner_iteration': 2,
+                           'sk_bound': 1e-10,
+                           'node_prior': 10,
+                           'max_iter': 5,  # iteration and error bound for calcuating barycenter
+                           'cost_bound': 1e-16,
+                           'update_p': False,  # optional updates of source distribution
+                           'lr': 0,
+                           'alpha': 0
+                           }
 
     time_s = time.time()
     D0 = linalg.expm(args.lambda_par * C0)
@@ -107,41 +104,32 @@ def main():
     D2 = linalg.expm(args.lambda_par * C2)
     D2 = (D2 + D2.T) / 2
 
-    Cs = [D0, D1, D2]
-    ps = [ot.unif(args.n_samples), ot.unif(args.n_samples), ot.unif(args.n_samples)]
-    lambdas = [1 / 3, 1 / 3, 1 / 3]
+    Cost_dict = {0:D0, 
+            1: D1, 
+             2 : D2}
+    ps_dict = {0:ot.unif(samp).reshape(-1,1), 1:ot.unif(samp).reshape(-1,1), 2:ot.unif(samp).reshape(-1,1)}
+    p = ot.unif(samp) # alternatively can estimate the target distribution from the sources
+    weights = {0:1/3, 1:1/3, 2:1/3}
 
-    f_bar, c_bar, log = fgw_barycenters(
-        args.n_samples,
-        Ys,
-        Cs,
-        ps,
-        lambdas,
-        alpha=0.95,
-        fixed_structure=False,
-        fixed_features=False,
-        p=None,
-        loss_fun="square_loss",
-        max_iter=args.max_iter,
-        tol=args.tolerance,
-        verbose=False,
-        random_seed=args.seed,
-        log=True,
-        init_C=None,
-        init_X=None,
-        armijo=args.use_armijo,
-        integrators=None,
-        method_type=None,
+    # brute force
+    b, t, s = gromov_wasserstein_barycenter(
+        costs=Cost_dict,
+        p_s=ps_dict,
+        ot_hyperpara=ot_dict,
+        p_center=p.reshape(-1,1),
+        weights=weights,
+        method_type = None,
+        N = None,
     )
     elapsed_time = time.time() - time_s
-    del C0, C1, C2, D0, D1, D2, Cs
-    dict0 = {"features": f_bar, "cost": c_bar, "log": log}
+    del C0, C1, C2, D0, D1, D2, Cost_dict
+    dict0 = {"barycenter": b, "transports": t, "distances": s, "time":elapsed_time}
     print("Saving the brute force data for visualization later")
     with open(os.path.join(args.output_dir, "brute_force_barycenter.pkl"), "wb") as fp:
         pickle.dump(dict0, fp, protocol=pickle.HIGHEST_PROTOCOL)
-    del dict0, f_bar, c_bar, log
+    del dict0, b, t, s
 
-    ### test diffusion variant
+    # test our diffusion variant
     time_s1 = time.time()
     dfgf_s0_integrator = DFGFIntegrator(
         positions=x0,
@@ -173,43 +161,22 @@ def main():
         density_function=density_function,
         fourier_transform=fourier_transform,
     )
-
-    Cs1 = [dfgf_s0_integrator, dfgf_s1_integrator, dfgf_s2_integrator]
-
-    f_bar1, c_bar1, log1 = fgw_barycenters(
-        args.n_samples,
-        Ys,
-        None,
-        ps,
-        lambdas,
-        alpha=0.95,
-        fixed_structure=False,
-        fixed_features=False,
-        p=None,
-        loss_fun="square_loss",
-        max_iter=args.max_iter,
-        tol=args.tolerance,
-        verbose=False,
-        random_seed=args.seed,
-        log=True,
-        init_C=None,
-        init_X=None,
-        armijo=args.use_armijo,
-        integrators=Cs1,
-        method_type="diffusion",
+    c_dict = {0:dfgf_s0_integrator, 1: dfgf_s1_integrator, 2:dfgf_s0_integrator }
+    b1, t1, s1 = gromov_wasserstein_barycenter(
+        costs=c_dict,
+        p_s=ps_dict,
+        ot_hyperpara=ot_dict,
+        p_center=p.reshape(-1,1),
+        weights=weights,
+        method_type = "diffusion",
+        N = None,
     )
     elapsed_time1 = time.time() - time_s1
-
-    dict1 = {"features": f_bar1, "cost": c_bar1, "log": log1}
+    del c_dist
+    dict1 = {"barycenter": b1, "transports": t1, "distances": s1, "time":elapsed_time1}
     print("Saving the diffusion barycenter data for visualization later")
-    with open(
-        os.path.join(args.output_dir, "diffusion_fgw_barycenter.pkl"), "wb"
-    ) as fp:
+    with open(os.path.join(args.output_dir, "diffusion_proximal_barycenter.pkl"), "wb") as fp:
         pickle.dump(dict1, fp, protocol=pickle.HIGHEST_PROTOCOL)
-    print("Saving completed.")
-    print(f"Time taken for computing Ground truth transport cost is {elapsed_time}")
-    print(f"Time taken for computing fast transport cost is {elapsed_time1}")
-
-
-if __name__ == "__main__":
-    main()
+    
+    if __name__ == "__main__":
+        main()
