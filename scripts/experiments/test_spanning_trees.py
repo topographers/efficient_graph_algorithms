@@ -1,10 +1,10 @@
 import numpy as np
 import networkx as nx
 
-
 from ega.algorithms.brute_force import BFGFIntegrator
 from ega.algorithms.spanning_trees import SpanningTreeGFIntegrator
-from graphs_networkx_utils import *
+from ega.util.graphs_networkx_utils import get_adjacency_nx, get_adjacency_lists_from_A, \
+                                            print_subopt_ratios, get_rel_diff
 
 
 def main():
@@ -41,7 +41,7 @@ def main():
     spanning_trees = SpanningTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees=0)
 
     # distance matrix match test
-    dist_T = spanning_trees._distance_matrix(adjacency_lists, weights_lists)
+    dist_T = spanning_trees.distance_matrix(adjacency_lists, weights_lists)
     assert np.allclose(f_fun(dist_T), brute_force.get_kernel_graph()), \
         print("distance matrices not computed correctly")
 
@@ -81,7 +81,7 @@ def main():
     print("PASSED adjacency and weights lists are consistent")
 
     # --------------- spanning trees distortion: averaging vs minimum ---------------
-    for num_trees in [1, 3]:
+    for num_trees in [1]:
         for graph_type in graphs.keys():
             print(f"{graph_type = }, {num_trees = }")    
             adjacency_lists, weights_lists = graphs[graph_type]
@@ -92,7 +92,7 @@ def main():
             dist_T = np.zeros((n,n))
             for i in range(spanning_trees._num_trees):
                 tadj_lists, tw_lists = spanning_trees._trees[i]['adj'], spanning_trees._trees[i]['w']
-                dist_Ti = spanning_trees._distance_matrix(tadj_lists, tw_lists)
+                dist_Ti = spanning_trees.distance_matrix(tadj_lists, tw_lists)
                 dist_T  += dist_Ti
             dist_T /= spanning_trees._num_trees
             print_subopt_ratios(dist_T, dist_G)
@@ -101,10 +101,11 @@ def main():
             min_dist_T = np.inf * np.ones((n,n))
             for i in range(spanning_trees._num_trees):
                 tadj_lists, tw_lists = spanning_trees._trees[i]['adj'], spanning_trees._trees[i]['w']
-                dist_Ti = spanning_trees._distance_matrix(tadj_lists, tw_lists)
+                dist_Ti = spanning_trees.distance_matrix(tadj_lists, tw_lists)
                 min_dist_T = np.minimum(min_dist_T, dist_Ti)
             print_subopt_ratios(min_dist_T, dist_G)
 
 
 if __name__ == '__main__':
     main()
+    

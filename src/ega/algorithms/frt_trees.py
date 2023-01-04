@@ -1,8 +1,8 @@
+from typing import Callable 
+
 import numpy as np 
 
-from ega.algorithms.trees import TreeGFIntegrator
-import copy
-
+from ega.algorithms.trees import TreeGFIntegrator, TreeDict
 
 
 class FRTTreeGFIntegrator(TreeGFIntegrator):
@@ -24,30 +24,28 @@ class FRTTreeGFIntegrator(TreeGFIntegrator):
     Implementation of matrix vector multiplication using Bartal trees is exact when 
     f_fun(x)=exp(ax), ie, is exponential function.
     """
-    def __init__(self, adjacency_lists, weights_lists, vertices, f_fun, num_trees=None):
+    def __init__(self, adjacency_lists:list[list[int]], \
+                       weights_lists:list[list[float]], \
+                       vertices:list, f_fun:Callable, num_trees:int):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
-        
         self.extra_n = [0]*self._num_trees
         for i in range(self._num_trees):
             self._trees[i] = self._sample_tree()
             self.extra_n[i] = len(self._trees[i]['adj']) - self.n
 
-
-    def _sample_tree(self):
+    def _sample_tree(self) -> TreeDict:
         # node2idx, idx2node
         cluster = set(range(self.n))
         return self._frt_tree(cluster)
-
     
-    def integrate_graph_field(self, field):
+    def integrate_graph_field(self, field: np.ndarray) -> np.ndarray:
         res = 0
         for idx, tree in enumerate(self._trees):
             field_i = np.concatenate([field, np.zeros([self.extra_n[idx]]+list(field.shape[1:]))], axis = 0)
             res += self._matvec_dynamic_programming(tree, field_i)[:self.n]
         return res / self._num_trees
 
-    
-    def _frt_tree(self, cluster0):
+    def _frt_tree(self, cluster0:set[int]) -> TreeDict:
         """
         FRT tree in the dictionary format
         tree = dict()
@@ -59,19 +57,18 @@ class FRTTreeGFIntegrator(TreeGFIntegrator):
         """
         delta = np.ceil(np.log2(self._diam / self._min_w))
         max_cluster_size = self.n
-
         root = self.n
         tadj_lists, tw_lists = [[] for _ in range(self.n+1)], [[] for _ in range(self.n+1)]
         levels = [[self.n]]
         parents = [0] * (self.n+1)
         parents[self.n] = None
         node_size = self.n + 1
-        leaf_clusters = [cluster0] # clusters on the current leaf level
+        leaf_clusters = next_leaf_clusters = [cluster0] # clusters on the current leaf level
         leaf_node_clusters = [self.n] # node numbers of leaf clusters
         pi = np.random.permutation(self.n)
         beta = np.random.uniform(0.5, 1)
         i = delta # diam(V)/2 = 2**i * w_min
-        while i >= 0 and max_cluster_size >= 2:
+        while i>=0 and max_cluster_size>=2 and (i==0 or len(next_leaf_clusters)>=1):
             R = beta * 2**i * self._min_w
             next_leaf_clusters, next_leaf_node_clusters = [], []
             levels += [[]]
@@ -103,11 +100,10 @@ class FRTTreeGFIntegrator(TreeGFIntegrator):
                         next_leaf_clusters += [new_cluster]
                         next_leaf_node_clusters += [new_cluster_node]
             i -= 1
-            if next_leaf_clusters == []: break
-            leaf_clusters = next_leaf_clusters
-            leaf_node_clusters = next_leaf_node_clusters
-            max_cluster_size = max([len(cl) for cl in next_leaf_clusters])
-            
+            if len(next_leaf_clusters) >= 1: 
+                leaf_clusters = next_leaf_clusters
+                leaf_node_clusters = next_leaf_node_clusters
+                max_cluster_size = max([len(cl) for cl in next_leaf_clusters])
         # add nodes from the graph to the leaves
         for cl_idx, cluster in enumerate(leaf_clusters):
             if len(cluster) == 0: continue
@@ -115,10 +111,14 @@ class FRTTreeGFIntegrator(TreeGFIntegrator):
             cluster_node = leaf_node_clusters[cl_idx]
             w = self._min_w * 2**max(0,i)
             self._add_node2tree(w, new_cluster_node, cluster_node, parents, levels, tadj_lists, tw_lists)
-        return {'root':root, 'parents':parents, 'adj':tadj_lists,  'w':tw_lists, 'levels':levels}
+        tree = {'root':root, 'parents':parents, \
+                'adj':tadj_lists,  'w':tw_lists, \
+                'levels':levels}
+        return tree
 
-
-    def _add_node2tree(self, w, new_cluster_node, cluster_node, parents, levels, tadj_lists, tw_lists):
+    def _add_node2tree(self, w:float, new_cluster_node:int, cluster_node:int, \
+                             parents:list[int], levels:list[list[int]], \
+                             tadj_lists:list[list[int]], tw_lists:list[list[float]]):
         """
         Add an edge between parent node cluster_node to a child node new_cluster_node, 
         modifying input lists.

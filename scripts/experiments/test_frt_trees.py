@@ -2,7 +2,8 @@ import numpy as np
 import networkx as nx
 
 from ega.algorithms.frt_trees import FRTTreeGFIntegrator
-from graphs_networkx_utils import *
+from ega.util.graphs_networkx_utils import get_adjacency_nx, get_adjacency_lists_from_A, \
+                                            print_subopt_ratios, get_rel_diff
 
 
 def main():
@@ -59,7 +60,7 @@ def main():
             levels = tree['levels']
             print(f"FRT tree on {n = } (all {len(tree['adj']) = }) with {len(levels) = }")
             # distance matrix on graph nodes
-            dist_T = frt_trees._distance_matrix(tadj_lists, tw_lists)[nodes, :][:,nodes]
+            dist_T = frt_trees.distance_matrix(tadj_lists, tw_lists)[nodes, :][:,nodes]
             M = f_fun(dist_T)
 
             nodes_levels = [node for lev in tree['levels'] for node in lev]
@@ -97,7 +98,7 @@ def main():
     for graph_type in graphs.keys():
         print(f"{graph_type = }")    
         adjacency_lists, weights_lists = graphs[graph_type]
-        num_trees = 20
+        num_trees = 10
         frt_trees = FRTTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
         dist_G = frt_trees._dist_G
 
@@ -105,7 +106,7 @@ def main():
         dist_T = np.zeros((n,n))
         for i in range(frt_trees._num_trees):
             tadj_lists, tw_lists = frt_trees._trees[i]['adj'], frt_trees._trees[i]['w']
-            dist_Ti = frt_trees._distance_matrix(tadj_lists, tw_lists)[nodes, :][:,nodes]
+            dist_Ti = frt_trees.distance_matrix(tadj_lists, tw_lists)[nodes, :][:,nodes]
             dist_T  += dist_Ti
         dist_T /= frt_trees._num_trees
         print_subopt_ratios(dist_T, dist_G)
@@ -114,7 +115,7 @@ def main():
         min_dist_T = np.inf * np.ones((n,n))
         for i in range(frt_trees._num_trees):
             tadj_lists, tw_lists = frt_trees._trees[i]['adj'], frt_trees._trees[i]['w']
-            dist_Ti = frt_trees._distance_matrix(tadj_lists, tw_lists)[nodes, :][:,nodes]
+            dist_Ti = frt_trees.distance_matrix(tadj_lists, tw_lists)[nodes, :][:,nodes]
             min_dist_T = np.minimum(min_dist_T, dist_Ti)
         print_subopt_ratios(min_dist_T, dist_G)
 

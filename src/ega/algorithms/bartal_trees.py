@@ -1,7 +1,15 @@
-import numpy as np 
+import numpy as np
+from typing import Callable, TypedDict 
 
-from ega.algorithms.trees import TreeGFIntegrator
+from ega.algorithms.trees import TreeGFIntegrator, TreeDict
 import random
+
+
+class BartalTreeDict(TypedDict):
+    root:int 
+    adj: list[list[int]] 
+    w: list[list[float]] 
+    node2idx: dict[int, int]
 
 
 class BartalTreeGFIntegrator(TreeGFIntegrator):
@@ -23,14 +31,15 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
     Implementation of matrix vector multiplication using Bartal trees is exact when 
     f_fun(x)=exp(ax), ie, is exponential function.
     """
-    def __init__(self, adjacency_lists, weights_lists, vertices, f_fun, num_trees=None):
+    def __init__(self, adjacency_lists:list[list[int]], \
+                       weights_lists:list[list[float]], \
+                       vertices:list, f_fun:Callable, num_trees:int):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
         
         for i in range(self._num_trees):
             self._trees[i] = self._sample_tree()
 
-
-    def _sample_tree(self):
+    def _sample_tree(self) -> TreeDict:
         # node2idx, idx2node
         cluster = list(range(self.n))
         diam = self._diam
@@ -43,10 +52,12 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
             tadj_lists[node] = tree['adj'][node_idx]
             tw_lists[node] = tree['w'][node_idx]
         levels, parents = self._tree_root2leaf_levels_parents(root, tadj_lists)
-        return {'root':root, 'parents':parents, 'adj':tadj_lists,  'w':tw_lists, 'levels':levels}
+        tree = {'root':root, 'parents':parents, \
+                'adj':tadj_lists,  'w':tw_lists, \
+                'levels':levels}
+        return tree
 
-    
-    def _bartal_tree(self, cluster, diam):
+    def _bartal_tree(self, cluster:list[int], diam:float) -> BartalTreeDict:
         """
         Bartal tree in the dictionary format
         tree = dict()
@@ -62,16 +73,13 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
             root = cluster[0]
             tree = {'root':root, 'adj':[[]],  'w':[[]], 'node2idx':{cluster[0]:0}}
             return tree
-
         new_clusters = self._low_diameter_decomposition(cluster, diam / 2)
         trees = [0]*len(new_clusters)
         for cl_idx, cluster_i in enumerate(new_clusters):
             trees[cl_idx] = self._bartal_tree(cluster_i, diam / 2)
-
         return self._merge_trees(trees, diam)
 
-
-    def _merge_trees(self, trees, w):
+    def _merge_trees(self, trees:BartalTreeDict, w:float) -> BartalTreeDict:
         """
         Merge trees by their roots using weight w
         Use node2idx lists to merge adjacency_lists and weights_lists properly
@@ -92,13 +100,10 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
             tree['w'][root_idx] += [w]
             tree['adj'][root_i_idx] += [root]
             tree['w'][root_i_idx] += [w]
-
             count += len(tree_i['node2idx'])
-        
         return tree 
 
-        
-    def _low_diameter_decomposition(self, cluster, diam):
+    def _low_diameter_decomposition(self, cluster:list[int], diam:float) -> list[int]:
         """
         Decompose current cluster into lower diameter clusters
         """

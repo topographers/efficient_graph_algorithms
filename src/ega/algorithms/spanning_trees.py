@@ -1,8 +1,9 @@
 import numpy as np 
 import networkx as  nx
 import random
+from typing import Callable
 
-from ega.algorithms.trees import TreeGFIntegrator
+from ega.algorithms.trees import TreeGFIntegrator, TreeDict
 import random
 
 
@@ -23,7 +24,9 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
     Implementation of matrix vector multiplication using trees is exact when 
     f_fun(x)=exp(ax), ie, is exponential function.
     """
-    def __init__(self, adjacency_lists, weights_lists, vertices, f_fun, num_trees=None):
+    def __init__(self, adjacency_lists:list[list[int]], \
+                       weights_lists:list[list[float]], \
+                       vertices:list, f_fun:Callable, num_trees:int):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
         
         A = self._numpy_adjacency_matrix()
@@ -32,8 +35,7 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
         for i in range(self._num_trees):
             self._trees[i] = self._sample_tree()
     
-
-    def _sample_tree(self):
+    def _sample_tree(self) -> TreeDict:
         """
         Sample a random spanning tree
         """
@@ -52,8 +54,7 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
                 'levels':levels}
         return tree
 
-
-    def _numpy_adjacency_matrix(self):
+    def _numpy_adjacency_matrix(self) -> np.ndarray:
         A = np.zeros((self.n, self.n))
         for i in range(self.n):
             for j_idx, j in enumerate(self._adjacency_lists[i]):
@@ -62,13 +63,12 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
                 A[j,i] = w
         return A
 
-    def _adjacency_lists_nx(self, G):
+    def _adjacency_lists_nx(self, G:nx.Graph) -> np.ndarray:
         A_srs = nx.to_scipy_sparse_array(G)
         A = np.array(A_srs.todense())
         return A
 
-
-    def _get_adjacency_lists_from_A(self, A):
+    def _get_adjacency_lists_from_A(self, A:np.ndarray) -> tuple[list[list[int]],list[list[float]]]:
         n = A.shape[0]
         adjacency_lists = [[] for _ in range(n)]
         weights_lists = [[] for _ in range(n)]
@@ -79,5 +79,5 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
                     adjacency_lists[j] += [i]
                     weights_lists[i] += [A[i,j]]
                     weights_lists[j] += [A[i,j]]
-        return adjacency_lists, weights_lists
+        return (adjacency_lists, weights_lists)
         

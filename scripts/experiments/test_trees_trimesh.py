@@ -4,7 +4,7 @@ import time
 import numpy as np
 import trimesh
 
-from graphs_networkx_utils import *
+from ega.util.graphs_networkx_utils import get_rel_diff
 
 from ega import default_trimesh_dataset_path
 from ega.algorithms.brute_force import BFGFIntegrator
@@ -53,21 +53,18 @@ def main():
 
     # PREPROCESSING
     start = time.time()
-    num_trees = 30
-    bartal_trees = BartalTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
-                                                    f_fun, num_trees)
+    num_trees = 20
+    bartal_trees = BartalTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
     end = time.time()
     print("Constructor for %d Bartal trees (BT) takes time: "%num_trees, end - start)
     start = time.time()
     num_trees = 1
-    spanning_trees = SpanningTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
-                                                    f_fun, num_trees)
+    spanning_trees = SpanningTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
     end = time.time()
     print("Constructor for %d Spanning trees (ST) takes time: "%num_trees, end - start)
     start = time.time()
-    num_trees = 30
-    frt_trees = FRTTreeGFIntegrator(adjacency_lists, weights_lists, vertices, \
-                                                    f_fun, num_trees)
+    num_trees = 20
+    frt_trees = FRTTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
     end = time.time()
     print("Constructor for %d FRT trees (FRT) takes time: "%num_trees, end - start)
     start = time.time()
@@ -91,28 +88,28 @@ def main():
     result = bartal_trees.integrate_graph_field(field)
     end = time.time()
     print("Graph field integration for Bartal trees (BT) takes time: ", end - start)
-    print(f"{get_rel_diff(result, den=result_bf)  = }")
+    print(f"{get_rel_diff(result, den=result_bf)=}")
 
     # Spanning trees GFI 
     start = time.time()
     result = spanning_trees.integrate_graph_field(field)
     end = time.time()
     print("Graph field integration for Spanning trees (ST) takes time: ", end - start)
-    print(f"{get_rel_diff(result, den=result_bf)  = }")
+    print(f"{get_rel_diff(result, den=result_bf)=}")
 
     # FRT trees GFI 
     start = time.time()
     result = frt_trees.integrate_graph_field(field)
     end = time.time()
     print("Graph field integration for FRT trees (FRT) takes time: ", end - start)
-    print(f"{get_rel_diff(result, den=result_bf)  = }")
+    print(f"{get_rel_diff(result, den=result_bf)=}")
 
     # Seperator GFI
     start = time.time()
     result = sgf_integrator.integrate_graph_field(field)
     end = time.time()
     print("Graph field integration for Balanced Separator (BS) takes time: ", end - start)
-    print(f"{get_rel_diff(result, den=result_bf)  = }")
+    print(f"{get_rel_diff(result, den=result_bf)=}")
 
 
 if __name__ == '__main__':
