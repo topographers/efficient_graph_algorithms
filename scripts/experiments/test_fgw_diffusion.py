@@ -148,14 +148,18 @@ def main():
         dim=3,
     )
     elapsed_time1 = time.time() - time1
+    rel_error = np.sum(np.abs(trans1 - trans0)) / np.sum(np.abs(trans0))
 
     print(f"Ground truth transport cost is {log0['fgw_dist']}")
     print(
-        f"Using fast matrix multiplication, truth transport cost is {log1['fgw_dist']}"
+        f"Using fast matrix multiplication, transport cost is {log1['fgw_dist']}"
     )
     print(f"Time taken for computing Ground truth transport cost is {elapsed_time}")
     print(f"Time taken for computing fast transport cost is {elapsed_time1}")
     print(f"Difference between the transport matrices are {((trans0-trans1)**2).sum()}")
+    print(f"Status message for GT computation is {log0['result_code']} and that of ours is {log1['result_code']}") #make sure they are both 1
+    print(f"Relative error between the transport matrices are {rel_error}")
+
 
 
 if __name__ == "__main__":
