@@ -105,6 +105,8 @@ def main():
     Cs[Cs > args.epsilon] = 0
     Ct[Ct > args.epsilon] = 0
 
+    print(f"Number of nonzero entries in source adj matrix is {np.count_nonzero(Cs)}") #need to understand the sparsity of these matrices
+
     time_s = time.time()
     Cs1 = sp.linalg.expm(args.lambda_par * Cs)
     Cs1 = (
