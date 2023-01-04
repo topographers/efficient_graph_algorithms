@@ -9,7 +9,7 @@ do
       for DRF in True False
       do
         echo "n_samples ${NSAMPLES} seed ${SEED} Armijo ${ARMIJO} drf ${DRF}"
-        python3 ./test_fgw_diffusion.py --seed $SEED --n_samples $NSAMPLES --use_armijo $ARMIJO --different_random_features $DRF > "fgw_diffusion_results/n${NSAMPLES}_seed${SEED}_armijo${ARMIJO}_drf${DRF}.txt"
+        python3 ./test_fgw_diffusion.py --seed $SEED --n_samples $NSAMPLES --use_armijo $ARMIJO --different_random_features $DRF > "fgw_diffusion_results/n${NSAMPLES}_seed${SEED}_armijo${ARMIJO}_drf${DRF}.txt" 2>&1
       done
     done
   done
