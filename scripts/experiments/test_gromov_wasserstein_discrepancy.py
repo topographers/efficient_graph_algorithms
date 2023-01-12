@@ -7,7 +7,6 @@ import random
 import time
 import argparse
 
-import trimesh
 
 from ega.algorithms.gromov_wasserstein_graphs import gromov_wasserstein_discrepancy
 
@@ -16,20 +15,20 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("--seed", default=42, type=int)
 parser.add_argument(
-    "--n_samples", default=3000, type=int, help="Number of random samples to draw"
+    "--n_samples", default=6000, type=int, help="Number of random samples to draw"
 )
 parser.add_argument(
     "--lambda_par",
-    default=1e-5,
+    default=-.15,
     type=float,
     help="Lambda for the smoothening of the kernel matrix",
 )
 parser.add_argument(
-    "--epsilon", default=0.1, type=float, help="Neighborhood distance around a point"
+    "--epsilon", default=0.3, type=float, help="Neighborhood distance around a point"
 )
 parser.add_argument(
     "--number_random_feats",
-    default=32,
+    default=16,
     type=int,
     help="Number of orthogonal random features, 16 and 32 works best for us. 64 produces bad results.",
 )
@@ -40,14 +39,18 @@ def main():
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    # Replace xs and xt with points from meshes
-    filepath = "../../data/curvox_dataset/meshes/Thingi10K/cat/textured.obj"
+    mu_s = np.array([0, 0, 0])
+    r_s = np.random.rand(3,3)+2.3*np.random.rand(3,3)
+    cov_s = np.matmul(r_s, r_s.T)
 
-    vertices = trimesh.load_mesh(filepath).vertices
-    xs = vertices[::7] * 0.9
-    xt = vertices[::13] * 1.1
-    print(f"Cat 1 has {len(xs)} vertices")
-    print(f"Cat 2 has {len(xt)} vertices")
+    mu_t = np.array([4, 4, 4])
+    r_t = np.random.rand(3,3)
+    cov_t = np.matmul(r_t, r_t.T)
+
+    P = sp.linalg.sqrtm(cov_t)
+
+    xs = np.random.randn(n_samples, 3).dot(cov_s) + mu_s
+    xt = np.random.randn(n_samples, 3).dot(P) + mu_t
 
     ### construct distance matrices
     Cs = scipy.spatial.distance.cdist(xs, xs, "minkowski", p=1)
@@ -58,16 +61,16 @@ def main():
     q = ot.unif(len(xt))
 
     ## sparsify the matrices
-    Cs[Cs > args.epsilon] = 0
-    Ct[Ct > args.epsilon] = 0
+    Cs[Cs >= args.epsilon] = 0
+    Ct[Ct >= args.epsilon] = 0
 
     # the key hyperparameters of GW distance
     ot_dict = {
         "loss_type": "L2",
         "ot_method": "proximal",
         "beta": 0.2,
-        "outer_iteration": 1000,  # outer, inner iteration, error bound of optimal transport
-        "iter_bound": 1e-10,
+        "outer_iteration": 1000,  # outer, inner iteration, error bound of optimal transport, for sample size less than 4000, change this to 200
+        "iter_bound": 1e-8,
         "inner_iteration": 2,
         "sk_bound": 1e-10,
         "node_prior": 10,
