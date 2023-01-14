@@ -646,6 +646,7 @@ def gromov_wasserstein_barycenter(
     bary_epsilon: float = None ,
     bary_lambda_par: float = None,
     bary_rand_feats: int = None,
+    init_bary : np.ndarray = None,
 
 ) -> Tuple[np.ndarray, Dict, List]:
     """
@@ -680,7 +681,10 @@ def gromov_wasserstein_barycenter(
     if p_center is None and N is not None :
         p_center = (np.ones(N) / N).reshape(-1,1)
 
-    barycenter0 = csr_matrix(np.diag(p_center[:, 0]))
+    if init_bary is None :
+        barycenter0 = csr_matrix(np.diag(p_center[:, 0]))
+    else : 
+        barycenter0 = init_bary
 
 
     d_gw_sum = []
