@@ -53,7 +53,7 @@ def main():
 
     # PREPROCESSING
     start = time.time()
-    num_trees = 20
+    num_trees = 10
     bartal_trees = BartalTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
     end = time.time()
     print("Constructor for %d Bartal trees (BT) takes time: "%num_trees, end - start)
@@ -63,7 +63,7 @@ def main():
     end = time.time()
     print("Constructor for %d Spanning trees (ST) takes time: "%num_trees, end - start)
     start = time.time()
-    num_trees = 20
+    num_trees = 5
     frt_trees = FRTTreeGFIntegrator(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
     end = time.time()
     print("Constructor for %d FRT trees (FRT) takes time: "%num_trees, end - start)

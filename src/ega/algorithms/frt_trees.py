@@ -1,4 +1,4 @@
-from typing import Callable 
+from typing import Callable, List, Set 
 
 import numpy as np 
 
@@ -24,9 +24,9 @@ class FRTTreeGFIntegrator(TreeGFIntegrator):
     Implementation of matrix vector multiplication using Bartal trees is exact when 
     f_fun(x)=exp(ax), ie, is exponential function.
     """
-    def __init__(self, adjacency_lists:list[list[int]], \
-                       weights_lists:list[list[float]], \
-                       vertices:list, f_fun:Callable, num_trees:int):
+    def __init__(self, adjacency_lists:List[List[int]], \
+                       weights_lists:List[List[float]], \
+                       vertices:List[int], f_fun:Callable, num_trees:int):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
         self.extra_n = [0]*self._num_trees
         for i in range(self._num_trees):
@@ -45,7 +45,7 @@ class FRTTreeGFIntegrator(TreeGFIntegrator):
             res += self._matvec_dynamic_programming(tree, field_i)[:self.n]
         return res / self._num_trees
 
-    def _frt_tree(self, cluster0:set[int]) -> TreeDict:
+    def _frt_tree(self, cluster0:Set[int]) -> TreeDict:
         """
         FRT tree in the dictionary format
         tree = dict()
@@ -117,8 +117,8 @@ class FRTTreeGFIntegrator(TreeGFIntegrator):
         return tree
 
     def _add_node2tree(self, w:float, new_cluster_node:int, cluster_node:int, \
-                             parents:list[int], levels:list[list[int]], \
-                             tadj_lists:list[list[int]], tw_lists:list[list[float]]):
+                             parents:List[int], levels:List[List[int]], \
+                             tadj_lists:List[List[int]], tw_lists:List[List[float]]):
         """
         Add an edge between parent node cluster_node to a child node new_cluster_node, 
         modifying input lists.

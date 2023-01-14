@@ -1,6 +1,6 @@
 import numpy as np 
 import abc
-from typing import Callable, Optional, TypedDict, Union
+from typing import Callable, Optional, TypedDict, Union, List, Set, Tuple
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import shortest_path
 
@@ -9,10 +9,10 @@ from ega.algorithms.gf_integrator import GFIntegrator
 
 class TreeDict(TypedDict):
     root:int 
-    adj: list[list[int]] 
-    w: list[list[float]] 
-    parents: list[int]
-    levels: list[list[int]]
+    adj: List[List[int]] 
+    w: List[List[float]] 
+    parents: List[int]
+    levels: List[List[int]]
 
 
 class TreeGFIntegrator(GFIntegrator):
@@ -32,9 +32,9 @@ class TreeGFIntegrator(GFIntegrator):
     Implementation of matrix vector multiplication using trees is exact when 
     f_fun(x)=exp(ax), ie, is exponential function.
     """
-    def __init__(self, adjacency_lists:list[list[int]], \
-                       weights_lists:list[list[float]], \
-                       vertices:list, f_fun:Callable, num_trees:int):
+    def __init__(self, adjacency_lists:List[List[int]], \
+                       weights_lists:List[List[float]], \
+                       vertices:List[int], f_fun:Callable, num_trees:int):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun)
         self.n = len(vertices)
         self._num_trees = num_trees
@@ -55,8 +55,8 @@ class TreeGFIntegrator(GFIntegrator):
             res += self._matvec_dynamic_programming(tree, field)
         return res / self._num_trees
 
-    def distance_matrix(self, adjacency_lists:list[list[int]], \
-                              weights_lists:list[list[float]]) -> np.ndarray:
+    def distance_matrix(self, adjacency_lists:List[List[int]], \
+                              weights_lists:List[List[float]]) -> np.ndarray:
         n = len(adjacency_lists)
         edges = np.zeros((n, n))
         for i in range(n):
@@ -69,7 +69,7 @@ class TreeGFIntegrator(GFIntegrator):
         return dist_G
 
     def _tree_root2leaf_levels_parents(self, root:int, \
-                                             tadj_lists:list[list[int]]) -> tuple[list[list[int]],list[int]]:
+                                             tadj_lists:List[List[int]]) -> Tuple[List[List[int]],List[int]]:
         """
         Given tree adjacency lists and a root, build levels of the tree
         and list of parents for each node
@@ -98,10 +98,10 @@ class TreeGFIntegrator(GFIntegrator):
                     f_fun(x) = exp(ax), exponential function
         tree = dict()
                 'root':root_node: int, 
-                'adj':t_adj_lists: list[list[int]], 
-                'w':t_w_lists: list[list[float]], 
-                'parents': list with parent nodes: list[int],
-                'levels':list with nodes on each level of the tree: list[list[int]]
+                'adj':t_adj_lists: List[List[int]], 
+                'w':t_w_lists: List[List[float]], 
+                'parents': list with parent nodes: List[int],
+                'levels':list with nodes on each level of the tree: List[List[int]]
         """
         # bottom-up traversal
         partial_sums = np.zeros(field.shape)
@@ -125,8 +125,8 @@ class TreeGFIntegrator(GFIntegrator):
         return sums
 
     def _shortest_path_ball(self, center:int, R:float, \
-                                  unsampled_nodes:Optional[set[int]]=None, \
-                                  list_type:Optional[bool]=True) -> Union[set[int],list[int]]:
+                                  unsampled_nodes:Optional[Set[int]]=None, \
+                                  list_type:Optional[bool]=True) -> Union[Set[int],List[int]]:
         """
         Return a cluster (connected component) from unsampled_nodes 
         centered at node center with radius < R.

@@ -1,7 +1,35 @@
 import numpy as np
 import networkx as nx
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import shortest_path
+from typing import Optional, List, Tuple
 
-from typing import Optional
+
+def dist_matrix_mst(adjacency_lists:List[List[int]], \
+                    weights_lists:List[List[float]]) -> Tuple[np.ndarray,float]:
+    """
+    Distance matrix of MST of a graph
+    """
+    A = numpy_adjacency_matrix(adjacency_lists, weights_lists)
+    G = nx.from_numpy_matrix(A)
+    T = nx.minimum_spanning_tree(G)
+    TA_srs = nx.to_scipy_sparse_array(T)
+    TA = np.array(TA_srs.todense())
+    csr_adjacency = csr_matrix(TA)
+    dist_TA = shortest_path(csgraph=csr_adjacency, directed=False)
+    return (dist_TA, TA.sum()/2)
+
+
+def numpy_adjacency_matrix(adjacency_lists:List[List[int]], \
+                           weights_lists:List[List[float]]) -> np.ndarray:
+    n = len(adjacency_lists)
+    A = np.zeros((n,n))
+    for i in range(n):
+        for j_idx, j in enumerate(adjacency_lists[i]):
+            w = weights_lists[i][j_idx]
+            A[i,j] = w
+            A[j,i] = w
+    return A
 
 
 def get_adjacency_lists_from_A(A:np.ndarray):
