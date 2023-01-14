@@ -1,7 +1,7 @@
 import numpy as np 
 import networkx as  nx
 import random
-from typing import Callable
+from typing import Callable, List
 
 from ega.algorithms.trees import TreeGFIntegrator, TreeDict
 import random
@@ -24,9 +24,9 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
     Implementation of matrix vector multiplication using trees is exact when 
     f_fun(x)=exp(ax), ie, is exponential function.
     """
-    def __init__(self, adjacency_lists:list[list[int]], \
-                       weights_lists:list[list[float]], \
-                       vertices:list, f_fun:Callable, num_trees:int):
+    def __init__(self, adjacency_lists:List[List[int]], \
+                       weights_lists:List[List[float]], \
+                       vertices:List[int], f_fun:Callable, num_trees:int):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
         
         A = self._numpy_adjacency_matrix()
@@ -68,7 +68,7 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
         A = np.array(A_srs.todense())
         return A
 
-    def _get_adjacency_lists_from_A(self, A:np.ndarray) -> tuple[list[list[int]],list[list[float]]]:
+    def _get_adjacency_lists_from_A(self, A:np.ndarray) -> tuple[List[List[int]],List[List[float]]]:
         n = A.shape[0]
         adjacency_lists = [[] for _ in range(n)]
         weights_lists = [[] for _ in range(n)]

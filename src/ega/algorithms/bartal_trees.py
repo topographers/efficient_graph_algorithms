@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Callable, TypedDict 
+from typing import Callable, TypedDict, List, Set, Dict 
 
 from ega.algorithms.trees import TreeGFIntegrator, TreeDict
 import random
@@ -7,9 +7,9 @@ import random
 
 class BartalTreeDict(TypedDict):
     root:int 
-    adj: list[list[int]] 
-    w: list[list[float]] 
-    node2idx: dict[int, int]
+    adj: List[List[int]] 
+    w: List[List[float]] 
+    node2idx: Dict[int, int]
 
 
 class BartalTreeGFIntegrator(TreeGFIntegrator):
@@ -31,9 +31,9 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
     Implementation of matrix vector multiplication using Bartal trees is exact when 
     f_fun(x)=exp(ax), ie, is exponential function.
     """
-    def __init__(self, adjacency_lists:list[list[int]], \
-                       weights_lists:list[list[float]], \
-                       vertices:list, f_fun:Callable, num_trees:int):
+    def __init__(self, adjacency_lists:List[List[int]], \
+                       weights_lists:List[List[float]], \
+                       vertices:List[int], f_fun:Callable, num_trees:int):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun, num_trees)
         
         for i in range(self._num_trees):
@@ -57,7 +57,7 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
                 'levels':levels}
         return tree
 
-    def _bartal_tree(self, cluster:list[int], diam:float) -> BartalTreeDict:
+    def _bartal_tree(self, cluster:List[int], diam:float) -> BartalTreeDict:
         """
         Bartal tree in the dictionary format
         tree = dict()
@@ -103,7 +103,7 @@ class BartalTreeGFIntegrator(TreeGFIntegrator):
             count += len(tree_i['node2idx'])
         return tree 
 
-    def _low_diameter_decomposition(self, cluster:list[int], diam:float) -> list[int]:
+    def _low_diameter_decomposition(self, cluster:List[int], diam:float) -> List[int]:
         """
         Decompose current cluster into lower diameter clusters
         """
