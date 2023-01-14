@@ -99,6 +99,7 @@ class SpanningTreeGFIntegrator(TreeGFIntegrator):
         """
         Kruskal's algorithm for constructing MST 
         Using Disjoint Set that supports fast union/find methods
+        The runtime is O(E log E  +E log V) = O(E log V) 
         """
         wij_list = []
         for i in range(self.n):
