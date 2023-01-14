@@ -4,7 +4,7 @@ import networkx as nx
 from ega.algorithms.brute_force import BFGFIntegrator
 from ega.algorithms.spanning_trees import SpanningTreeGFIntegrator
 from ega.util.graphs_networkx_utils import get_adjacency_nx, get_adjacency_lists_from_A, \
-                                            print_subopt_ratios, get_rel_diff
+                                            print_subopt_ratios, get_rel_diff, dist_matrix_mst
 
 
 def main():
@@ -17,6 +17,19 @@ def main():
 
     ## CREATE GRAPHS
     graphs = {}
+    # Geometric random graph
+    print("Geometric random graph")
+    positions = np.random.rand(n, 3)
+    r = 0.45
+    A = np.zeros((n,n))
+    for i in range(n):
+        for j in range(i+1, n):
+            w  = np.linalg.norm(positions[i] - positions[j])
+            if w <= r:
+                A[i,j] = w; A[j,i] = w
+    adjacency_lists, weights_lists = get_adjacency_lists_from_A(A)
+    print(f"{1.*(A>0).sum(axis=0).min() = }, {1.*(A>0).sum(axis=0).mean() = }, {1.*(A>0).sum(axis=0).max() = }")
+    graphs['geom'] = (adjacency_lists, weights_lists)
     # Random tree
     print("Random tree graph")
     G = nx.random_tree(n=n)
@@ -77,8 +90,18 @@ def main():
                     assert node in tree['adj'][ni], print("adjacency lists does not is not complete")
                     node_idx = (tree['adj'][ni]).index(node)
                     assert tree['w'][node][ni_idx] == tree['w'][ni][node_idx]
+
+        dist_T_true, mst_true = dist_matrix_mst(adjacency_lists, weights_lists)
+        tadj_lists, tw_lists = spanning_trees.minimum_spanning_tree()
+        dist_T = spanning_trees.distance_matrix(tadj_lists, tw_lists)
+        assert np.allclose(dist_T, dist_T_true), print("error in MST implementation")
+        assert len([e for ei in tadj_lists for e in ei])/2 == len(adjacency_lists)-1 and\
+            np.allclose(sum([we for wei in tw_lists for we in wei])/2, mst_true),\
+            print(graph_type, len([e for ei in tadj_lists for e in ei])/2, len(adjacency_lists)-1,\
+                 sum([we for wei in tw_lists for we in wei])/2, mst_true)
             
     print("PASSED adjacency and weights lists are consistent")
+    print("PASSED Kruskal's algorithm implementation")
 
     # --------------- spanning trees distortion: averaging vs minimum ---------------
     for num_trees in [1]:

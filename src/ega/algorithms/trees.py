@@ -1,6 +1,6 @@
 import numpy as np 
 import abc
-from typing import Callable, Optional, TypedDict, Union, List, Set
+from typing import Callable, Optional, TypedDict, Union, List, Set, Tuple
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import shortest_path
 
@@ -69,7 +69,7 @@ class TreeGFIntegrator(GFIntegrator):
         return dist_G
 
     def _tree_root2leaf_levels_parents(self, root:int, \
-                                             tadj_lists:List[List[int]]) -> tuple[List[List[int]],List[int]]:
+                                             tadj_lists:List[List[int]]) -> Tuple[List[List[int]],List[int]]:
         """
         Given tree adjacency lists and a root, build levels of the tree
         and list of parents for each node
