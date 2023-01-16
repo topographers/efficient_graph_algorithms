@@ -20,22 +20,22 @@ parser.add_argument(
 )
 parser.add_argument(
     "--lambda_par",
-    default=1e-5,
+    default=-.3,
     type=float,
     help="Lambda for the smoothening of the kernel matrix",
 )
 parser.add_argument(
-    "--epsilon", default=0.1, type=float, help="Neighborhood distance around a point"
+    "--epsilon", default=0.15, type=float, help="Neighborhood distance around a point"
 )
 parser.add_argument(
     "--number_random_feats",
-    default=32,
+    default=16,
     type=int,
     help="Number of orthogonal random features, 16 and 32 works best for us. 64 produces bad results.",
 )
 parser.add_argument(
     "--use_armijo",
-    default=True,
+    default=False,
     type=bool,
     help="Whether to armijo line search algorithms. Turn it off if there are numerical instabilities",
 )
@@ -46,14 +46,18 @@ def main():
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    # Replace xs and xt with points from meshes
-    filepath = "../../data/curvox_dataset/meshes/Thingi10K/cat/textured.obj"
+    mu_s = np.array([0, 0, 0])
+    r_s = np.random.rand(3,3)+np.random.rand(3,3)
+    cov_s = np.matmul(r_s, r_s.T)
 
-    vertices = trimesh.load_mesh(filepath).vertices
-    xs = vertices[::31] * 0.9
-    xt = vertices[::37] * 1.1
-    print(f"Cat 1 has {len(xs)} vertices")
-    print(f"Cat 2 has {len(xt)} vertices")
+    mu_t = np.array([4, 4, 4])
+    r_t = np.random.rand(3,3)
+    cov_t = np.matmul(r_t, r_t.T)
+
+    Q = sp.linalg.sqrtm(cov_s)
+    xs = np.random.randn(n_samples, 3).dot(Q) + mu_s
+    P = sp.linalg.sqrtm(cov_t)
+    xt = np.random.randn(n_samples, 3).dot(P) + mu_t
 
     ### construct distance matrices
     Cs = scipy.spatial.distance.cdist(xs, xs, "minkowski", p=1)
