@@ -16,12 +16,12 @@ parser.add_argument(
 )
 parser.add_argument(
     "--lambda_par",
-    default=1e-4,
+    default=-.25,
     type=float,
     help="Lambda for the smoothening of the kernel matrix",
 )
 parser.add_argument(
-    "--epsilon", default=0.1, type=float, help="Neighborhood distance around a point"
+    "--epsilon", default=0.3, type=float, help="Neighborhood distance around a point"
 )
 parser.add_argument(
     "--number_random_feats",
