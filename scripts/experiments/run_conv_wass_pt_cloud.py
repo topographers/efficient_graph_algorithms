@@ -3,6 +3,8 @@ import numpy as np
 import pickle
 
 from time import time
+
+import pyvista
 import torch
 import pyvista as pv
 from pyvista import examples
@@ -101,12 +103,20 @@ def main():
 
     args = parser.parse_args()
 
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cpu")
     # generate examples
-    beta = pv.ParametricTorus()
-    beta = pv.PolyData(beta)
+    # beta = pv.ParametricTorus()
+    # beta = pv.PolyData(beta)
 
-    alpha = examples.download_bunny()
+    # alpha = examples.download_bunny()
+    alpha = examples.download_face()
+    beta = examples.download_teapot()
+    # alpha = pyvista.PolyData("/home/david/workspace/efficient_graph_algorithms/data/trimesh/models/100642.stl")
+    # beta = pyvista.PolyData("/home/david/workspace/efficient_graph_algorithms/data/trimesh/models/100478.stl")
+    print(f"alpha has {len(alpha.points)} points")
+    print(f"beta has {len(beta.points)} points")
+
     # rotate the data and apply some transformations
     alpha.rotate_x(args.x_rot)
     alpha.rotate_z(args.z_rot)
@@ -136,7 +146,8 @@ def main():
     hists /= hists.sum(axis=(1, 2, 3))[:, None, None, None]
     hists = torch.tensor(hists).type(torch.float32)
     hists = hists.to(device)
-    interpolating_points = [0.0, 0.25, 0.5, 0.75, 1.0]  # interpolating points
+    interpolating_points = [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0]  # interpolating points
+    # interpolating_points = np.linspace(0, 1, 10).astype(np.float)  # interpolating points
 
     data = dict(ibp=dict(times=[], bars=[]))
     bars = []
@@ -164,13 +175,17 @@ def main():
             print("->> creating mesh {} ... ".format(ii + 1))
             support = torch.where(hist > args.error)
             weights = hist[support].numpy()
-            cloud = torch.stack((X[support], Y[support], Z[support])).t()
-            render_pointcloud_still_np(
-                cloud.numpy(),
-                "test_interpolation" + str(ii) + ".png",
-                scale_points=False,
-                camera_position=(2.2, 2.2, 2.2),
-            )
+            cloud = torch.stack((X[support], Y[support], Z[support])).t().numpy()
+            if len(cloud) > 0:
+                render_pointcloud_still_np(
+                    cloud,
+                    "test_interpolation" + str(ii) + ".png",
+                    scale_points=False,
+                    camera_position=(2.2, 2.2, 2.2),
+                )
+                np.save("test_interpolation"+str(ii)+".npy", cloud)
+            else:
+                print(f"Cloud {ii + 1} has no points!")
 
 
 if __name__ == "__main__":
