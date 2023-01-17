@@ -1,4 +1,6 @@
 import argparse
+import os
+
 import numpy as np
 import pickle
 
@@ -103,6 +105,10 @@ def main():
 
     args = parser.parse_args()
 
+    save_directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "process_conv_wass_pt_cloud_results")
+    if not os.path.exists(save_directory):
+        os.makedirs(save_directory)
+
     # device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     device = torch.device("cpu")
     # generate examples
@@ -152,14 +158,14 @@ def main():
     data = dict(ibp=dict(times=[], bars=[]))
     bars = []
     for ii, w in enumerate(interpolating_points):
-        print("->>> Doing weight {} ... ".format(ii + 1))
+        print(f"->>> Doing weight {ii+1} ... ")
         weights = torch.tensor([1.0 - w, w])
         t0 = time()
         bar_ibp = convolutional_wasserstein_barycenter_pt_cloud(
             hists, reg=args.regularizer, weights=weights, threshold=args.error
         )
         t1 = time()
-        print("IBP done in ", t1 - t0)
+        print(f"IBP done in {t1-t0}")
         data["ibp"]["times"].append(t1 - t0)
         data["ibp"]["bars"].append(bar_ibp.cpu())
 
@@ -172,18 +178,18 @@ def main():
     for key in ["ibp"]:
         bars = data[key]["bars"]
         for ii, hist in enumerate(bars):
-            print("->> creating mesh {} ... ".format(ii + 1))
+            print(f"->> creating mesh {ii+1} ... ")
             support = torch.where(hist > args.error)
             weights = hist[support].numpy()
             cloud = torch.stack((X[support], Y[support], Z[support])).t().numpy()
             if len(cloud) > 0:
                 render_pointcloud_still_np(
                     cloud,
-                    "test_interpolation" + str(ii) + ".png",
+                    os.path.join(save_directory, f"test_interpolation{ii}.png"),
                     scale_points=False,
                     camera_position=(2.2, 2.2, 2.2),
                 )
-                np.save("test_interpolation"+str(ii)+".npy", cloud)
+                np.save(os.path.join(save_directory, f"test_interpolation{ii}.npy"), cloud)
             else:
                 print(f"Cloud {ii + 1} has no points!")
 
