@@ -80,7 +80,7 @@ def _generate_random_tree(size, random_vertex_costs):
 
     if random_vertex_costs:
         # Hacks to make numba work
-        vertex_costs = np.array([np.random.uniform(0, 1) for _ in range(size)], dtype=float32)
+        vertex_costs = np.array([np.random.uniform(0, 1) for _ in range(size)], dtype=np.float32)
     else:
         vertex_costs = np.ones(size, dtype=np.float32)
 
