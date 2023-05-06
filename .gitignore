@@ -4,6 +4,12 @@ __pycache__/
 *$py.class
 .idea/
 
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+__pycache__
+*/__pycache__/*
+
+
 # C extensions
 *.so
 
@@ -27,6 +33,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.idea/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

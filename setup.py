@@ -12,7 +12,8 @@ setuptools.setup(
     long_description="TODO",
     long_description_content_type="text/markdown",
     url="https://github.com/topographers",
-    packages=setuptools.find_packages('src'),
+    packages=['ega', 'planar_separators'],
+    package_dir={'': 'src'},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
