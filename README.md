@@ -21,6 +21,8 @@ pip3 install -r requirements.txt
 pip3 install -e . --user
 git clone https://github.com/topographers/planar_separators.git
 ```
+If you have error when running command line ```pip3 install -e . --user```, you can follow this [link](https://github.com/microsoft/vscode-python/issues/14327#issuecomment-757408341).
+
 
 ## Coding Guidelines
 
