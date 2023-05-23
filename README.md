@@ -1,5 +1,15 @@
 # efficient_graph_algorithms
-Implementations of efficient graph algorithms
+
+
+This is the PyTorch implementation of ["Efficient Graph Field Integrators Meet Point Clouds"](https://arxiv.org/abs/2302.00942). 
+
+Krzysztof Choromanski\*, Arijit Sehanobish\*, Han Lin\*, Yunfan Zhao\*, Eli Berger, Tetiana Parshakova, Alvin Pan, David Watkins, Tianyi Zhang, Valerii Likhosherstov, Somnath Basu Roy Chowdhury, Avinava Dubey, Deepali Jain, Tamas Sarlos, Snigdha Chaturvedi, Adrian Weller
+
+
+Google Research, Columbia University, Haifa University, Stanford University, The Boston Dynamics AI Institute, University of Cambridge, The University of North Carolina at Chapel Hill, The Alan Turing Institute.
+
+The Fortieth International Conference on Machine Learning (ICML), 2023
+
 
 ## Installation
 ```bash
