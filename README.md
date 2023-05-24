@@ -54,3 +54,13 @@ For information on how to run each experiment:
 For information on how to download and prepare meshgraphnet dataset:
 
 * [docs/experiments/prepare_graph_mesh_data.md](docs/experiments/prepare_graph_mesh_data.md)
+
+### Wasserstein Barycenter
+
+Follow the instructions above to download Thingi10K mesh [data](https://ten-thousand-models.appspot.com/).
+
+To run experiments on this task:
+```sh
+python scripts/experiments/compare_dfgf_bfgf_wass_barycenter.py
+python scripts/experiments/compare_psgf_bfgf_wass_barycenter.py 
+```
