@@ -6,9 +6,10 @@ from ega.algorithms.gf_integrator import GFIntegrator
 from tqdm import tqdm 
 
 class BFGFIntegrator(GFIntegrator):
-    def __init__(self, adjacency_lists, weights_lists, vertices, f_fun):
+    def __init__(self, adjacency_lists, weights_lists, vertices, f_fun, apply_f_fun=True):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun)
         self._m_matrix = self.get_kernel_graph()
+        self.apply_f_fun = apply_f_fun
 
     def get_kernel_graph(self):
         n = len(self._adjacency_lists)
@@ -23,7 +24,9 @@ class BFGFIntegrator(GFIntegrator):
         #dist_G = floyd_warshall(csgraph=csr_adjacency, directed=False)
         dist_G = shortest_path(csgraph=csr_adjacency, directed=False)
         
-        return self._f_fun(dist_G)
+        if self.apply_f_fun:
+            return self._f_fun(dist_G)
+        return dist_G
 
     def integrate_graph_field(self, field):
         return np.einsum('ij,j...->i...', self._m_matrix, field)
