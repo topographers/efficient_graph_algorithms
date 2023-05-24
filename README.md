@@ -50,17 +50,22 @@ For information on how to run each experiment:
 * [scripts/experiments/separator_test.py](docs/experiments/separator_test.md)
 * [scripts/experiments/graph_diffusion_gf_integrator_test.py](docs/experiments/graph_diffusion_integrator_test.md)
 
-## MeshGraphNet Datasets
-For information on how to download and prepare meshgraphnet dataset:
-
-* [docs/experiments/prepare_graph_mesh_data.md](docs/experiments/prepare_graph_mesh_data.md)
 
 ### Wasserstein Barycenter
 
 Follow the instructions above to download Thingi10K mesh [data](https://ten-thousand-models.appspot.com/).
 
-To run experiments on this task:
+To run experiments for RFD:
 ```sh
 python scripts/experiments/compare_dfgf_bfgf_wass_barycenter.py
+```
+
+To run experiments for SF:
+```sh
 python scripts/experiments/compare_psgf_bfgf_wass_barycenter.py 
 ```
+
+## MeshGraphNet Datasets
+For information on how to download and prepare meshgraphnet dataset:
+
+* [docs/experiments/prepare_graph_mesh_data.md](docs/experiments/prepare_graph_mesh_data.md)
