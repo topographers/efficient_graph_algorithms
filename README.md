@@ -27,11 +27,13 @@ git clone https://github.com/topographers/planar_separators.git
 If you have error when running command line ```pip3 install -e . --user```, you can follow this [link](https://github.com/microsoft/vscode-python/issues/14327#issuecomment-757408341).
 
 
-## Coding Guidelines
-
-We have a strict coding guideline that is written [here](docs/coding_guidelines.md). This should be read thoroughly before contribution to this repository.
-
 ## Experiments
+
+### Vertex Normal Prediction
+
+First download Thingi10K mesh data from this [link](https://ten-thousand-models.appspot.com/)
+
+
 For information on how to run each experiment:
 
 * [scripts/experiments/gaussian_kernel_test.py](docs/experiments/gaussian_kernel_test.md)
