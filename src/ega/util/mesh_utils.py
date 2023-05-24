@@ -106,6 +106,7 @@ def generate_weights_from_adjacency_list(adjacency_lists: List[List[int]]) -> Li
     return weight_lists
 
 
+
 def calculate_interpolation_metrics(true_fields: np.ndarray, interpolated_fields: np.ndarray):
     """ 
     this function calculates the frobenius norma and cosine similarity between predicted and true graph fields. 
@@ -118,6 +119,7 @@ def calculate_interpolation_metrics(true_fields: np.ndarray, interpolated_fields
     cosine_similarity = np.mean((true_fields * interpolated_fields).sum(axis=-1) / \
                                 np.linalg.norm(true_fields, axis=-1) / np.linalg.norm(interpolated_fields, axis=-1))
     print("Frobenious Norm: {}\nCosine Similarity: {}".format(frobenius_norm, cosine_similarity))
+    return frobenius_norm, cosine_similarity
 
 
 def density_function(input_projection: np.ndarray) -> np.ndarray:
