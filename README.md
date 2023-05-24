@@ -33,7 +33,7 @@ If you have error when running command line ```pip3 install -e . --user```, you 
 
 First download Thingi10K mesh data from this [link](https://ten-thousand-models.appspot.com/). The mesh IDs we used in our paper are listed in Appendix C1 of our paper.
 
-```vertex_normal_prediction_config.yaml``` is an example configuration file to run vertex normal prediction task.
+```scripts/experiments/vertex_normal_prediction_config.yaml``` is an example configuration file to run vertex normal prediction task.
 
 To run experiment on this task:
 ```sh
