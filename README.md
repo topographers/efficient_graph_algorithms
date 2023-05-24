@@ -10,7 +10,7 @@ Google Research, Columbia University, Haifa University, Stanford University, The
 
 The Fortieth International Conference on Machine Learning (ICML), 2023
 
-![diagram](https://github.com/topographers/efficient_graph_algorithms/edit/han_updated_readme/image.png)
+![diagram](https://github.com/topographers/efficient_graph_algorithms/blob/han_updated_readme/image.png)
 
 
 ## Installation
