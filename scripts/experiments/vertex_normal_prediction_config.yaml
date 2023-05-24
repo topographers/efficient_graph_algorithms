@@ -1,0 +1,282 @@
+BartalTree:
+  bartaltree_num_trees_list:
+  - 3
+  bartaltree_sigma_list:
+  - 0.1
+  - 0.2
+  - 0.5
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 20
+  - 30
+  - 40
+  - 50
+  - 60
+  - 70
+  - 80
+  - 90
+  - 100
+FRTTree:
+  frttree_num_trees_list:
+  - 3
+  frttree_sigma_list:
+  - 0.1
+  - 0.2
+  - 0.5
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 20
+  - 30
+  - 40
+  - 50
+  - 60
+  - 80
+  - 100
+  - 300
+SpanningTree:
+  spanningtree_sigma_list:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 20
+  - 30
+  - 40
+  - 50
+  - 60
+  - 70
+  - 80
+  - 90
+  - 100
+  - 150
+  - 200
+  - 250
+  - 300
+almohy2009:
+  almohy_sigma_list:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+almohy32:
+  almohy_sigma_list:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+almohy64:
+  almohy_sigma_list:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+brute_force:
+  bf_sigma_list:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 15
+  - 20
+  - 25
+  - 50
+  - 75
+  - 100
+  - 150
+  - 200
+  - 250
+  - 300
+brute_force_eps:
+  bfeps_epsilon_list:
+  - 0.01
+  - 0.05
+  - 0.1
+  - 0.5
+  - 1
+  - 2
+  - 5
+  bfeps_sigma_list:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 15
+  - 20
+  - 25
+  - 50
+  - 75
+  - 100
+  - 150
+  - 200
+  - 250
+  - 300
+brute_force_knn:
+  bfknn_knn_list:
+  - 5
+  - 10
+  - 15
+  - 20
+  bfknn_sigma_list:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 15
+  - 20
+  - 25
+  - 50
+  - 75
+  - 100
+  - 150
+  - 200
+  - 250
+  - 300
+graph_diffusion:
+  gdgf_epsilon_list:
+  - 0.1
+  - 0.2
+  - 0.5
+  - 1
+  - 2
+  - 5
+  gdgf_lambda_par_list:
+  - -100
+  - -10
+  - -1
+  - -0.1
+  - -0.001
+  - -0.0001
+  gdgf_num_random_features:
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+lanczos:
+  lanczos_knn_list:
+  - 5
+  - 10
+  - 20
+  - 50
+  lanczos_numdim_list:
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  lanczos_sigma_list:
+  - -0.001
+  - -0.003
+  - -0.01
+  - -0.03
+  - -0.1
+  - -0.3
+  - -0.5
+  - -1
+  - -2
+  - -5
+  - -10
+  - -25
+  - -50
+  - -100
+  - -200
+log_file: ./vertex_normal_prediction_log.txt
+mask_ratio: 0.8
+meshgraph_file_ids:
+- 110793
+- 1514901
+- 116878
+- 550964
+- 409624
+meshgraph_path: /home/han/thingi10k
+method_list:
+- brute_force
+result_file: ./vertex_normal_prediction_result.csv
+seperator:
+  sgf_sigma_list:
+  - 0.1
+  - 0.5
+  - 1
+  - 2
+  - 5
+  - 10
+  - 20
+  - 30
+  - 40
+  - 50
+  - 60
+  - 70
+  - 80
+  - 90
+  - 100
+  - 150
+  - 200
+  - 300
+  sgf_unit_size_list:
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+torch_matrix_exp:
+  tme_sigma_list:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
