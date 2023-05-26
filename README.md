@@ -1,5 +1,16 @@
 # Efficient Graph Field Integrators
 
+Given weighted undirected graph $G=(V, E, W)$, a kernel $K:V\times V \rightarrow \mathbb{R}$ 
+and a tensor field $\mathcal{F}:V \rightarrow \mathbb{R}^{d_{1} \times \ldots \times d_{l}}$ 
+defined on $V$, where $d_{1},\ldots,d_{l}$ stand for tensor dimensions.
+
+
+In this repository, we implement several methods that allow efficient computation of
+```math
+i(v) := \sum_{w \in \mathrm{V}}\mathrm{K}(w,v)\mathcal{F}(w), \qquad \text{for all } v \in V.
+```
+We refer to the process of computing $i(v)$ as **graph-field integration** (GFI).
+
 
 This repository accompanies the paper ["Efficient Graph Field Integrators Meet Point Clouds"](https://arxiv.org/abs/2302.00942). 
 
@@ -28,7 +39,7 @@ If you have error when running command line ```pip3 install -e . --user```, you 
 
 ## Getting started
 
-We implement several GFI (graph field integrators) that inherit from `GFIntegrator`.
+This repository contains implementations of several GFIs that inherit from `GFIntegrator`.
 They can be categorized based on their representation of point clouds: 
 
 1. Mesh graph-based representation
