@@ -1,7 +1,7 @@
-# efficient_graph_algorithms
+# Efficient Graph Field Integrators
 
 
-This is the PyTorch implementation of ["Efficient Graph Field Integrators Meet Point Clouds"](https://arxiv.org/abs/2302.00942). 
+This repository accompanies the paper ["Efficient Graph Field Integrators Meet Point Clouds"](https://arxiv.org/abs/2302.00942). 
 
 Krzysztof Choromanski\*, Arijit Sehanobish\*, Han Lin\*, Yunfan Zhao\*, Eli Berger, Tetiana Parshakova, Alvin Pan, David Watkins, Tianyi Zhang, Valerii Likhosherstov, Somnath Basu Roy Chowdhury, Avinava Dubey, Deepali Jain, Tamas Sarlos, Snigdha Chaturvedi, Adrian Weller
 
@@ -26,10 +26,31 @@ git clone https://github.com/topographers/planar_separators.git
 ```
 If you have error when running command line ```pip3 install -e . --user```, you can follow this [link](https://github.com/microsoft/vscode-python/issues/14327#issuecomment-757408341).
 
+## Getting started
+
+We implement several GFI (graph field integrators) that inherit from `GFIntegrator`.
+They can be categorized based on their representation of point clouds: 
+
+1. Mesh graph-based representation
+  - separator factorization GFI `SeparationGFIntegrator`
+  - trees approximating graph metric
+    - FRT trees-based `FRTTreeGFIntegrator`
+    - Bartal trees-based GFI `BartalTreeGFIntegrator`
+    - spanning tree-based GFI `SpanningTreeGFIntegrator`
+2. $\epsilon$-NN (Nearest Neighbor) based representation
+  - random feature diffusion GFI `DFGFIntegrator`
+
+These GFIs can be readily used for the following tasks
+- interpolation task using `Interpolator`
+  - by specifying parameters`GFIntegrator, vertices_known, vertices_interpolate` at instantiation
+  - and after, calling method `interpolate` while specifying the field values on the `vetrices_known`
+- Wasserstein barycenter using `ConvolutionalBarycenter`
+  - by specifying parameters `niter, tolerance` at instantiation
+  - and after, calling method `get_convolutional_barycenter` while specifying array with distributions, mixing weights and `GFIntegrator.integrate_graph_field` 
 
 ## Experiments
 
-### Vertex Normal Prediction
+### Vertex normal prediction
 
 First download Thingi10K mesh data from this [link](https://ten-thousand-models.appspot.com/). The mesh IDs we used in our paper are listed in Appendix C1 of our paper.
 
@@ -40,8 +61,6 @@ To run experiment on this task:
 python scripts/experiments/vertex_normal_prediction.py 
 ```
 
-
-
 For information on how to run each experiment:
 
 * [scripts/experiments/gaussian_kernel_test.py](docs/experiments/gaussian_kernel_test.md)
@@ -51,7 +70,7 @@ For information on how to run each experiment:
 * [scripts/experiments/graph_diffusion_gf_integrator_test.py](docs/experiments/graph_diffusion_integrator_test.md)
 
 
-### Wasserstein Barycenter
+### Wasserstein barycenter
 
 Follow the instructions above to download Thingi10K mesh [data](https://ten-thousand-models.appspot.com/).
 
@@ -65,7 +84,12 @@ To run experiments for SF:
 python scripts/experiments/compare_psgf_bfgf_wass_barycenter.py 
 ```
 
-## MeshGraphNet Datasets
+To run experiments for trees:
+```sh
+python scripts/experiments/bf_tspan_sf_wass_barycenter.py
+```
+
+## MeshGraphNet datasets
 For information on how to download and prepare meshgraphnet dataset:
 
 * [docs/experiments/prepare_graph_mesh_data.md](docs/experiments/prepare_graph_mesh_data.md)
