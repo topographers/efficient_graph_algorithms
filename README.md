@@ -100,6 +100,38 @@ To run experiments for trees:
 python scripts/experiments/bf_tspan_sf_wass_barycenter.py
 ```
 
+### (Fused) Gromov-Wasserstein discrepancy 
+
+To run experiments for RFD on GW with conjugate gradient method:
+```sh
+python scripts/experiments/test_gromov_wasserstein.py
+```
+
+To run experiments for RFD on GW with proximal method:
+```sh
+python scripts/experiments/test_gromov_wasserstein_discrepancy.py
+```
+
+To run experiments for RFD on FGW:
+```sh
+python scripts/experiments/test_fgw_diffusion.py
+```
+
+To run experiments for SF on GW with conjugate gradient method:
+```sh
+python scripts/experiments/test_gw_separator.py
+```
+
+To run experiments for SF on GW with proximal method:
+```sh
+python scripts/experiments/test_gw_discrepancy_separator.py
+```
+
+To run experiments for RFD on FGW:
+```sh
+python scripts/experiments/test_fgw_separator.py
+```
+
 ## MeshGraphNet datasets
 For information on how to download and prepare meshgraphnet dataset:
 
