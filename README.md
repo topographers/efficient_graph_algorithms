@@ -58,6 +58,12 @@ These GFIs can be readily used for the following tasks
 - Wasserstein barycenter using `ConvolutionalBarycenter`
   - by specifying parameters `niter, tolerance` at instantiation
   - and after, calling method `get_convolutional_barycenter` while specifying array with distributions, mixing weights and `GFIntegrator.integrate_graph_field` 
+- Gromov Wasserstein discrepancy 
+  - Proximal point algorithm using `gromov_wasserstein_discrepancy`
+  - conditional gradient algorithm using `gw_lp`
+- Fused Gromov Wasserstein using `fgw_lp`
+- Point cloud classification
+
 
 ## Experiments
 
