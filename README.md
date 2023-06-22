@@ -134,7 +134,7 @@ python scripts/experiments/test_fgw_separator.py
 
 ## Point Cloud classification
 We also use the approximated RFD kernel matrix for point cloud classification on ModelNet10. 
-The code to run it is in * [notebooks/point_cloud_classification.ipynb](notebooks/point_cloud_classification.ipynb)
+The code to run it is in [notebooks/point_cloud_classification.ipynb](notebooks/point_cloud_classification.ipynb)
 
 ## MeshGraphNet datasets
 For information on how to download and prepare meshgraphnet dataset:
