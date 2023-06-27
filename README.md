@@ -58,6 +58,12 @@ These GFIs can be readily used for the following tasks
 - Wasserstein barycenter using `ConvolutionalBarycenter`
   - by specifying parameters `niter, tolerance` at instantiation
   - and after, calling method `get_convolutional_barycenter` while specifying array with distributions, mixing weights and `GFIntegrator.integrate_graph_field` 
+- Gromov Wasserstein discrepancy 
+  - Proximal point algorithm using `gromov_wasserstein_discrepancy`
+  - conditional gradient algorithm using `gw_lp`
+- Fused Gromov Wasserstein using `fgw_lp`
+- Point cloud classification
+
 
 ## Experiments
 
@@ -99,6 +105,42 @@ To run experiments for trees:
 ```sh
 python scripts/experiments/bf_tspan_sf_wass_barycenter.py
 ```
+
+### (Fused) Gromov-Wasserstein discrepancy 
+
+To run experiments for RFD on GW with conjugate gradient method:
+```sh
+python scripts/experiments/test_gromov_wasserstein.py
+```
+
+To run experiments for RFD on GW with proximal method:
+```sh
+python scripts/experiments/test_gromov_wasserstein_discrepancy.py
+```
+
+To run experiments for RFD on FGW:
+```sh
+python scripts/experiments/test_fgw_diffusion.py
+```
+
+To run experiments for SF on GW with conjugate gradient method:
+```sh
+python scripts/experiments/test_gw_separator.py
+```
+
+To run experiments for SF on GW with proximal method:
+```sh
+python scripts/experiments/test_gw_discrepancy_separator.py
+```
+
+To run experiments for SF on FGW:
+```sh
+python scripts/experiments/test_fgw_separator.py
+```
+
+## Point Cloud classification
+We also use the approximated RFD kernel matrix for point cloud classification on ModelNet10. 
+The code to run it is in [notebooks/point_cloud_classification.ipynb](notebooks/point_cloud_classification.ipynb)
 
 ## MeshGraphNet datasets
 For information on how to download and prepare meshgraphnet dataset:
