@@ -8,8 +8,9 @@ from tqdm import tqdm
 class BFGFIntegrator(GFIntegrator):
     def __init__(self, adjacency_lists, weights_lists, vertices, f_fun, apply_f_fun=True):
         super().__init__(adjacency_lists, weights_lists, vertices, f_fun)
-        self._m_matrix = self.get_kernel_graph()
         self.apply_f_fun = apply_f_fun
+        self._f_fun = f_fun
+        self._m_matrix = self.get_kernel_graph()
 
     def get_kernel_graph(self):
         n = len(self._adjacency_lists)
